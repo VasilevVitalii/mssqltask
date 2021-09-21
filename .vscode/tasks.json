@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-core",
+            "type": "shell",
+            "command": "npx tsc --build --pretty"
+        },
+        {
+            "label": "build",
+            "dependsOrder": "sequence",
+            "dependsOn": ["build-core"]
+        }
+    ]
+}

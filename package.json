@@ -18,6 +18,7 @@
     },
     "homepage": "https://github.com/VasilevVitalii/mssqltask#readme",
     "dependencies": {
+        "vv-mssql": "0.0.44",
         "vv-shared": "^5.0.4"
     },
     "devDependencies": {

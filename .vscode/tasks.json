@@ -7,9 +7,14 @@
             "command": "npx tsc --build --pretty"
         },
         {
+            "label": "build-post",
+            "type": "shell",
+            "command": "node build.post.js"
+        },
+        {
             "label": "build",
             "dependsOrder": "sequence",
-            "dependsOn": ["build-core"]
+            "dependsOn": ["build-core", "build-post"]
         }
     ]
 }

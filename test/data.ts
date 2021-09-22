@@ -1,7 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs'
 import * as server from '../src/server'
-import { json } from 'stream/consumers'
 
 export function servers(): server.Server[] {
     const full_file_name = path.join(__dirname, '..', '..', 'test', 'servers.json')

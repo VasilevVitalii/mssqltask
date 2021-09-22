@@ -19,6 +19,8 @@ export type TypeStorage = {
 
 export class Job {
     readonly storage: TypeStorage
+    private job: schedule.Job
+    private callback_ontick: () => void
 
     constructor(storage: TypeStorage) {
         if (storage.kind === 'cron') {
@@ -78,13 +80,27 @@ export class Job {
         return {cron: `${second} ${minute} ${hour} ${day_of_month} ${month} ${day_of_week}`, native: false}
     }
 
-    start() {
-        const job = schedule.scheduleJob('* * * * *', function(){
-            console.log('The answer to life, the universe, and everything!');
+    ontick(callback: () => void) {
+        this.callback_ontick = callback
+    }
+
+    start(): boolean {
+        if (this.job) return true
+        const callback = this.callback_ontick
+        this.job = schedule.scheduleJob(this.cron().cron, function(){
+            if (!callback) return
+            callback()
         })
+        if (this.job === null) {
+            this.job = undefined
+            return false
+        }
+        return true
     }
 
     stop() {
-
+        if (!this.job) return
+        this.job.cancel()
+        this.job = undefined
     }
 }

@@ -17,7 +17,7 @@ export type TypeStorage = {
     periodicity: 'every' | 'once'
 }
 
-export class Job {
+export class Metronom {
     readonly storage: TypeStorage
     private job: schedule.Job
     private callback_ontick: () => void

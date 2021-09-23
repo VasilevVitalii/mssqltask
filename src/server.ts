@@ -1,3 +1,4 @@
+import * as fs from 'fs'
 import * as mssql from 'vv-mssql'
 import * as vvs from 'vv-shared'
 
@@ -10,8 +11,23 @@ export type TypeStorage = {
     tags: string[]
 }
 
+export type TypeMessage = {
+    text: string,
+    type: 'info' | 'error'
+}
+
 export type TypeExecResult =
-    {kind: 'spid', spid: number}
+    {kind: 'start', spid: number} |
+    {kind: 'stop', duration: number, error: Error, messages: TypeMessage[]}
+
+export type TypeExecResultToFile =
+    {kind: 'start', spid: number} |
+    {kind: 'stop', duration: number, error: Error}
+
+export type TypeExecResultToSend =
+    {kind: 'start', spid: number} |
+    {kind: 'process', table_index: number, table_rows: any[], messages: TypeMessage[]} |
+    {kind: 'stop', duration: number, error: Error}
 
 export class Server {
     private server: mssql.app
@@ -93,21 +109,142 @@ export class Server {
         })
     }
 
-    // exec(queries: string[], allow_tables: boolean, callback: (error: Error, result: TypeExecResult) => void ) {
-    //     this.ping(false, () => {
-    //         if (this.ping_error) {
-    //             callback(this.ping_error, undefined)
-    //             return
-    //         }
-    //         this.server.exec(queries, {allow_tables: allow_tables, chunk: {type: 'msec', chunk: 1000}, database: 'master', get_spid: true, null_to_undefined: true, stop_on_error: true}, (exec_result => {
-    //             if (exec_result.type === 'spid') {
-    //                 callback(undefined, {kind: 'spid', spid: exec_result.spid || 0})
-    //                 return
-    //             }
-    //             // if (exec_result.type === 'chunk') {
-    //             //     exec_result.chunk.table.
-    //             // }
-    //         }))
-    //     })
-    // }
+    exec(queries: string[], callback: (result: TypeExecResult) => void) {
+        this.ping(false, () => {
+            if (this.ping_result.error) {
+                callback({
+                    kind: 'stop',
+                    duration: 0,
+                    error: this.ping_result.error,
+                    messages: []
+                })
+                return
+            }
+            this.server.exec(queries, {allow_tables: false, database: 'master', get_spid: true, stop_on_error: true}, exec_result => {
+                if (exec_result.type === 'spid') {
+                    callback({
+                        kind: 'start',
+                        spid: exec_result.spid || -1
+                    })
+                    return
+                }
+                if (exec_result.type === 'end') {
+                    callback({
+                        kind: 'stop',
+                        duration: 0,
+                        error: this.ping_result.error,
+                        messages: exec_result.end.message_list.map(m => { return {text: m.message, type: m.type} }) || []
+                    })
+                    return
+                }
+            })
+        })
+    }
+
+    exec_to_file(queries: string[], tables_full_file_name: string, messages_full_file_name: string, callback: (result: TypeExecResultToFile) => void) {
+        this.ping(false, () => {
+            if (this.ping_result.error) {
+                callback({
+                    kind: 'stop',
+                    duration: 0,
+                    error: this.ping_result.error
+                })
+                return
+            }
+
+            let tables_stream = undefined as fs.WriteStream
+            let messages_stream = undefined as fs.WriteStream
+
+            try {
+                if (!vvs.isEmptyString(tables_full_file_name)) {
+                    tables_stream = fs.createWriteStream(tables_full_file_name, 'utf8')
+                }
+                if (!vvs.isEmptyString(messages_full_file_name)) {
+                    messages_stream = fs.createWriteStream(messages_full_file_name, 'utf8')
+                }
+            } catch (error) {
+                callback({
+                    kind: 'stop',
+                    duration: 0,
+                    error: this.ping_result.error
+                })
+                return
+            }
+
+            let error_stream = undefined as Error
+
+            this.server.exec(queries, {allow_tables: true, chunk: {type: 'msec', chunk: 200}, database: 'master', get_spid: true, null_to_undefined: true, stop_on_error: true}, exec_result => {
+                if (exec_result.type === 'spid') {
+                    callback({
+                        kind: 'start',
+                        spid: exec_result.spid || -1
+                    })
+                    return
+                }
+                if (exec_result.type === 'chunk') {
+                    if (tables_stream && !error_stream && exec_result.chunk.table && exec_result.chunk.table.row_list && exec_result.chunk.table.row_list.length > 0) {
+                        const table_index = exec_result.chunk.table.table_index || -1
+                        tables_stream.write(exec_result.chunk.table.row_list.map(m => { return JSON.stringify({table_index: table_index, row: m}) }).join('\n'), error => {
+                            error_stream = error
+                        })
+                    }
+                    if (messages_stream && !error_stream && exec_result.chunk.message_list && exec_result.chunk.message_list.length > 0) {
+                        messages_stream.write(JSON.stringify(exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })), error => {
+                            error_stream = error
+                        })
+                    }
+                    return
+                }
+                if (exec_result.type === 'end') {
+                    tables_stream.close()
+                    messages_stream.close()
+                    callback({
+                        kind: 'stop',
+                        duration: exec_result.end.duration || 0,
+                        error: vvs.isEmpty(error_stream) ? exec_result.end.error : error_stream
+                    })
+                    return
+                }
+            })
+        })
+    }
+
+    exec_to_send(queries: string[], callback: (result: TypeExecResultToSend) => void ) {
+        this.ping(false, () => {
+            if (this.ping_result.error) {
+                callback({
+                    kind: 'stop',
+                    duration: 0,
+                    error: this.ping_result.error
+                })
+                return
+            }
+            this.server.exec(queries, {allow_tables: true, chunk: {type: 'msec', chunk: 200}, database: 'master', get_spid: true, null_to_undefined: true, stop_on_error: true}, exec_result => {
+                if (exec_result.type === 'spid') {
+                    callback({
+                        kind: 'start',
+                        spid: exec_result.spid || -1
+                    })
+                    return
+                }
+                if (exec_result.type === 'chunk') {
+                    callback({
+                        kind: 'process',
+                        table_index: exec_result.chunk.table?.table_index || -1,
+                        table_rows: exec_result.chunk.table?.row_list || [],
+                        messages: exec_result.chunk?.message_list.map(m => { return {text: m.message, type: m.type} }) || []
+                    })
+                    return
+                }
+                if (exec_result.type === 'end') {
+                    callback({
+                        kind: 'stop',
+                        duration: exec_result.end.duration || 0,
+                        error: exec_result.end.error
+                    })
+                    return
+                }
+            })
+        })
+    }
 }

@@ -3,7 +3,7 @@ import * as data from './data'
 import * as server from '../src/server'
 import * as metronom from '../src/metronom'
 
-const q = `SELECT * FROM rrMasterData.dbo.Assortment; WAITFOR DELAY '00:00:05';SELECT * FROM rrGoodsMovement.dbo.Income`
+const q = `PRINT 'Hello'; SELECT * FROM rrMasterData.dbo.Assortment /*WHERE Code = 14280*/; WAITFOR DELAY '00:00:01';SELECT * FROM rrGoodsMovement.dbo.Income`
 //const q = `SELECT * FROM [master].sys.objects; WAITFOR DELAY '00:00:05';SELECT * FROM [master].sys.objects`
 
 const servers = data.servers()
@@ -19,6 +19,9 @@ servers_ping(servers, 0, () => {
         // })
         s.exec_to_file([q], 'd:/111.txt', 'd:/222.txt', result => {
             console.log(result)
+            if (result.kind === 'stop') {
+                //process.exit()
+            }
         })
     })
 })

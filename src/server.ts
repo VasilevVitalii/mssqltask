@@ -158,6 +158,9 @@ export class Server {
             try {
                 if (!vvs.isEmptyString(tables_full_file_name)) {
                     tables_stream = fs.createWriteStream(tables_full_file_name, 'utf8')
+                    // tables_stream.on('drain',() => {
+                    //     console.log('tables_stream FINISH!')
+                    // })
                 }
                 if (!vvs.isEmptyString(messages_full_file_name)) {
                     messages_stream = fs.createWriteStream(messages_full_file_name, 'utf8')
@@ -172,40 +175,98 @@ export class Server {
             }
 
             let error_stream = undefined as Error
+            let has_tables = false
+            let has_messages = false
+            let write_tables = 0
+            let write_messages = 0
 
             this.server.exec(queries, {allow_tables: true, chunk: {type: 'msec', chunk: 200}, database: 'master', get_spid: true, null_to_undefined: true, stop_on_error: true}, exec_result => {
                 if (exec_result.type === 'spid') {
                     callback({
                         kind: 'start',
-                        spid: exec_result.spid || -1
+                        spid: vvs.toInt(exec_result.spid, -1)
                     })
                     return
                 }
                 if (exec_result.type === 'chunk') {
                     if (tables_stream && !error_stream && exec_result.chunk.table && exec_result.chunk.table.row_list && exec_result.chunk.table.row_list.length > 0) {
-                        const table_index = exec_result.chunk.table.table_index || -1
-                        tables_stream.write(exec_result.chunk.table.row_list.map(m => { return JSON.stringify({table_index: table_index, row: m}) }).join('\n'), error => {
+                        if (!has_tables) {
+                            write_tables++
+                            tables_stream.write('[\n', error => {
+                                write_tables--
+                                error_stream = error
+                            })
+                            has_tables = true
+                        }
+                        const table_index = vvs.toInt(exec_result.chunk.table.table_index, -1)
+                        write_tables++
+                        tables_stream.write(exec_result.chunk.table.row_list.map(m => { return JSON.stringify({table_index: table_index, row: m}) }).join(',\n').concat(',\n'), error => {
+                            console.log('WRITE STOP')
+                            write_tables--
+                            if (vvs.isEmpty(error)) return
                             error_stream = error
                         })
                     }
                     if (messages_stream && !error_stream && exec_result.chunk.message_list && exec_result.chunk.message_list.length > 0) {
-                        messages_stream.write(JSON.stringify(exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })), error => {
+                        if (!has_messages) {
+                            write_messages++
+                            messages_stream.write('[\n', error => {
+                                write_messages--
+                                error_stream = error
+                            })
+                            has_messages = true
+                        }
+                        write_messages++
+                        messages_stream.write(exec_result.chunk.message_list.map(m => { return JSON.stringify({text: m.message, type: m.type}) }).join(',\n').concat(',\n'), error => {
+                            write_messages--
+                            if (vvs.isEmpty(error)) return
                             error_stream = error
                         })
                     }
                     return
                 }
                 if (exec_result.type === 'end') {
-                    tables_stream.close()
-                    messages_stream.close()
-                    callback({
-                        kind: 'stop',
-                        duration: exec_result.end.duration || 0,
-                        error: vvs.isEmpty(error_stream) ? exec_result.end.error : error_stream
+                    console.log('END!', write_tables, write_messages)
+                    this.exec_to_file_write_end([
+                        vvs.isEmpty(error_stream) && has_tables === true ? tables_stream : undefined,
+                        vvs.isEmpty(error_stream) && has_messages === true ? messages_stream : undefined,
+                    ], 0, error => {
+                        if (!vvs.isEmpty(error)) {
+                            error_stream = error
+                        }
+                        // try {
+                        //     tables_stream.close()
+                        //     messages_stream.close()
+                        // // eslint-disable-next-line no-empty
+                        // } catch (error) {}
+                        callback({
+                            kind: 'stop',
+                            duration: vvs.toFloat(exec_result.end.duration, 0),
+                            error: vvs.isEmpty(error_stream) ? exec_result.end.error : error_stream
+                        })
                     })
-                    return
                 }
             })
+        })
+    }
+
+    private exec_to_file_write_end(streams: fs.WriteStream[], idx: number, callback: (error: Error) => void) {
+        if (idx >= streams.length) {
+            callback(undefined)
+            return
+        }
+        if (vvs.isEmpty(streams[idx])) {
+            idx++
+            this.exec_to_file_write_end(streams, idx, callback)
+            return
+        }
+        streams[idx].write(']', error => {
+            if (vvs.isEmpty(error)) {
+                idx++
+                this.exec_to_file_write_end(streams, idx, callback)
+                return
+            }
+            callback(error)
         })
     }
 

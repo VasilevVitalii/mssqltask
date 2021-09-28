@@ -1,5 +1,7 @@
 //import worker_threads from 'worker_threads'
 
+import worker_threads from 'worker_threads'
+
 export interface IApp {
     start(): void,
 }
@@ -20,3 +22,16 @@ export function create(callback?: (error: Error | undefined) => void): IApp {
         }
     }
 }
+
+/*
+
+facade with all worker manage
+    always workers by each tasks
+        temporary worker by each server exec
+
+
+log/yyyyddmm/task1/hhmmssmmm.json
+log/yyyyddmm/task1/hhmmssmmm/rows_0.json
+log/yyyyddmm/task1/hhmmssmmm/messages_0.json
+
+*/

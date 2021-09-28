@@ -1,7 +1,7 @@
 import * as vvs from 'vv-shared'
 import * as schedule from 'node-schedule'
 
-export type TypeStorage = {
+export type TypeMetronom = {
     kind: 'cron',
     cron: string
 } | {
@@ -18,35 +18,35 @@ export type TypeStorage = {
 }
 
 export class Metronom {
-    readonly storage: TypeStorage
+    readonly options: TypeMetronom
     private job: schedule.Job
     private callback_ontick: () => void
 
-    constructor(storage: TypeStorage) {
-        if (storage.kind === 'cron') {
-            this.storage = {
+    constructor(options: TypeMetronom) {
+        if (options.kind === 'cron') {
+            this.options = {
                 kind: 'cron',
-                cron: vvs.isEmptyString(storage.cron) ? '* * * * * *' : storage.cron
+                cron: vvs.isEmptyString(options.cron) ? '* * * * * *' : options.cron
             }
-        } else if (storage.kind === 'scheduler') {
-            this.storage = {
+        } else if (options.kind === 'scheduler') {
+            this.options = {
                 kind: 'scheduler',
-                weekday_sun: vvs.isEmpty(storage.weekday_sun) ? false : storage.weekday_sun,
-                weekday_mon: vvs.isEmpty(storage.weekday_mon) ? false : storage.weekday_mon,
-                weekday_tue: vvs.isEmpty(storage.weekday_tue) ? false : storage.weekday_tue,
-                weekday_wed: vvs.isEmpty(storage.weekday_wed) ? false : storage.weekday_wed,
-                weekday_thu: vvs.isEmpty(storage.weekday_thu) ? false : storage.weekday_thu,
-                weekday_fri: vvs.isEmpty(storage.weekday_fri) ? false : storage.weekday_fri,
-                weekday_sat: vvs.isEmpty(storage.weekday_sat) ? false : storage.weekday_sat,
-                period_minutes: vvs.isEmpty(storage.period_minutes) || storage.period_minutes < 1 || storage.period_minutes > 1439 ? 60 : storage.period_minutes,
-                periodicity: storage.periodicity === 'every' || storage.periodicity === 'once' ? storage.periodicity : 'every'
+                weekday_sun: vvs.isEmpty(options.weekday_sun) ? false : options.weekday_sun,
+                weekday_mon: vvs.isEmpty(options.weekday_mon) ? false : options.weekday_mon,
+                weekday_tue: vvs.isEmpty(options.weekday_tue) ? false : options.weekday_tue,
+                weekday_wed: vvs.isEmpty(options.weekday_wed) ? false : options.weekday_wed,
+                weekday_thu: vvs.isEmpty(options.weekday_thu) ? false : options.weekday_thu,
+                weekday_fri: vvs.isEmpty(options.weekday_fri) ? false : options.weekday_fri,
+                weekday_sat: vvs.isEmpty(options.weekday_sat) ? false : options.weekday_sat,
+                period_minutes: vvs.isEmpty(options.period_minutes) || options.period_minutes < 1 || options.period_minutes > 1439 ? 60 : options.period_minutes,
+                periodicity: options.periodicity === 'every' || options.periodicity === 'once' ? options.periodicity : 'every'
             }
         }
     }
 
     cron() : {cron: string, native: boolean} {
-        if (this.storage.kind === 'cron') {
-            return {cron: this.storage.cron, native: true}
+        if (this.options.kind === 'cron') {
+            return {cron: this.options.cron, native: true}
         }
 
         const second = '0'
@@ -56,22 +56,22 @@ export class Metronom {
         const month = '*'
         let day_of_week = '*'
 
-        if (this.storage.periodicity === 'every') {
-            minute = `*/${this.storage.period_minutes}`
+        if (this.options.periodicity === 'every') {
+            minute = `*/${this.options.period_minutes}`
         } else {
-            const h = Math.floor(this.storage.period_minutes / 60)
-            minute = `${this.storage.period_minutes - (h * 60)}`
+            const h = Math.floor(this.options.period_minutes / 60)
+            minute = `${this.options.period_minutes - (h * 60)}`
             hour = `${h}`
         }
 
         const day_of_week_list = [
-            this.storage.weekday_sun === true ? 0 : undefined,
-            this.storage.weekday_mon === true ? 1 : undefined,
-            this.storage.weekday_tue === true ? 2 : undefined,
-            this.storage.weekday_wed === true ? 3 : undefined,
-            this.storage.weekday_thu === true ? 4 : undefined,
-            this.storage.weekday_fri === true ? 5 : undefined,
-            this.storage.weekday_sat === true ? 6 : undefined,
+            this.options.weekday_sun === true ? 0 : undefined,
+            this.options.weekday_mon === true ? 1 : undefined,
+            this.options.weekday_tue === true ? 2 : undefined,
+            this.options.weekday_wed === true ? 3 : undefined,
+            this.options.weekday_thu === true ? 4 : undefined,
+            this.options.weekday_fri === true ? 5 : undefined,
+            this.options.weekday_sat === true ? 6 : undefined,
         ].filter(f => !vvs.isEmpty(f))
         if (day_of_week_list.length < 7) {
             day_of_week = day_of_week_list.join(',')

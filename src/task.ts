@@ -28,7 +28,8 @@ export type TypeResultTicket = {
 
 export type TypeTaskState =
     {kind: 'start'} |
-    {kind: 'spid', server_instance: string, spid: number}
+    {kind: 'process', ticket: TypeResultTicket} |
+    {kind: 'stop'}
 
 export class Type {
     private options: TypeTask
@@ -97,19 +98,23 @@ export class Type {
             server.exec(this.options.query, false, result_exec => {
                 if (result_exec.kind === 'start') {
                     ticket_server.execSpId = result_exec.spid
-                    this.sendChanged({kind: 'spid', server_instance: server.options.instance, spid: result_exec.spid})
+                    this.sendChanged({kind: 'process', ticket: ticket})
                     return
                 }
                 if (result_exec.kind === 'stop') {
                     ticket_server.execDurationMsec = result_exec.duration
                     ticket_server.execError = result_exec.error? result_exec.error.message : ''
                     ticket_server.countMessages = result_exec.messages.length
+                    this.sendChanged({kind: 'process', ticket: ticket})
                     if (server_idx + 1 === this.servers.length) {
+                        this.sendChanged({kind: 'stop'})
                         z.write(this.full_file_names().messages, ticket, error => {
                             this.sendError(error)
                         })
                     }
+                    return
                 }
+                this.sendError(new Error (`onTickTablesNo() - unprocessed result_exec with kind ${result_exec?.kind}`))
             })
         })
     }

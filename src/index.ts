@@ -34,9 +34,15 @@ log/yyyyddmm/task1/hhmmssmmm.json
 log/yyyyddmm/task1/hhmmssmmm/rows_0.json
 log/yyyyddmm/task1/hhmmssmmm/messages_0.json
 
+
 log/yyyyddmm/task/tickets/     t.task.yyyyddmm.hhmmssmmm.json
 log/yyyyddmm/task/rows/        r.task.yyyyddmm.hhmmssmmm.json
 log/yyyyddmm/task/messages/    m.task.yyyyddmm.hhmmssmmm.json
+
+
+log/task/yyyyddmm/tickets/     t.task.yyyyddmm.hhmmssmmm.json
+log/task/yyyyddmm/rows/        r.task.yyyyddmm.hhmmssmmm.json
+log/task/yyyyddmm/messages/    m.task.yyyyddmm.hhmmssmmm.json
 
 
 ticket

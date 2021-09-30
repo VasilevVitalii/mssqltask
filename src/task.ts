@@ -1,12 +1,15 @@
+import path from 'path'
 import * as vvs from 'vv-shared'
 import { Metronom, TypeMetronom } from './metronom'
 import { Server, TypeServer } from './server'
+import * as z from './z'
 
 export type TypeTask = {
     metronom: TypeMetronom
     servers: TypeServer[]
     query: string
     allow_tables: boolean
+    log_key: string
     log_path: string
 }
 
@@ -88,7 +91,7 @@ export class Type {
         } as TypeResultTicket
 
         this.sendChanged({kind: 'start'})
-        this.servers.forEach(server => {
+        this.servers.forEach((server, server_idx) => {
             const ticket_server = ticket.servers.find(f => f.instance === server.options.instance)
 
             server.exec(this.options.query, false, result_exec => {
@@ -101,10 +104,24 @@ export class Type {
                     ticket_server.execDurationMsec = result_exec.duration
                     ticket_server.execError = result_exec.error? result_exec.error.message : ''
                     ticket_server.countMessages = result_exec.messages.length
-
-                    //result_exec.
+                    if (server_idx + 1 === this.servers.length) {
+                        z.write(this.full_file_names().messages, ticket, error => {
+                            this.sendError(error)
+                        })
+                    }
                 }
             })
         })
+    }
+
+    private full_file_names(): {ticket: string, rows: string, messages: string} {
+        const d = new Date()
+        const path_prefix = path.join(this.options.log_path, this.options.log_key, vvs.formatDate(d, 112))
+        const file_suffix = `${this.options.log_key}.${vvs.formatDate(d, 112)}.${vvs.formatDate(d,114).replace(/:/g, '')}.json`
+        return {
+            ticket: path.join(path_prefix, 'tickets', `t.${file_suffix}`),
+            rows: path.join(path_prefix, 'rows', `r.${file_suffix}`),
+            messages: path.join(path_prefix, 'messages', `m.${file_suffix}`),
+        }
     }
 }

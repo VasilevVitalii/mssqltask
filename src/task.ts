@@ -1,6 +1,6 @@
 import path from 'path'
 import worker_threads from 'worker_threads'
-import { Metronom, TypeMetronom } from './metronom'
+import * as metronom from 'vv-metronom'
 import { TypeExecResult, TypeServer } from './server'
 import { TypeWorkerData, TypeWorkedResult } from './task.worker'
 
@@ -16,7 +16,7 @@ export type TypeTaskResult = {
     // {kind: 'save', allow_tables: boolean, allow_messages: boolean, key: string, path: string}
 
 export type TypeTask = {
-    metronom: TypeMetronom
+    metronom: metronom.TypeMetronom
     servers: TypeServer[]
     query: string
     result: TypeTaskResult
@@ -43,7 +43,7 @@ export type TypeTaskState =
 
 export class Task {
     private options: TypeTask
-    private metronom: Metronom
+    private metronom: metronom.Metronom
     private servers: TypeServer[]
     private state: {
         needStop: boolean
@@ -55,7 +55,7 @@ export class Task {
 
     constructor(options: TypeTask) {
         this.options = options
-        this.metronom = new Metronom(this.options.metronom)
+        this.metronom = metronom.CreateMetronom(this.options.metronom)
         this.servers = this.options.servers
         this.state = {
             needStop: false,

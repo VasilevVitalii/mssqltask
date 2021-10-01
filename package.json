@@ -20,7 +20,8 @@
     "dependencies": {
         "fs-extra": "^10.0.0",
         "node-schedule": "^2.0.0",
-        "vv-filestream": "0.0.5",
+        "vv-filestream": "0.0.6",
+        "vv-metronom": "0.0.2",
         "vv-mssql": "0.0.44",
         "vv-shared": "^5.0.4"
     },

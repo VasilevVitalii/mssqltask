@@ -25,10 +25,9 @@ export function create(callback?: (error: Error | undefined) => void): IApp {
 
 /*
 
-facade with all worker manage
-    always workers by each tasks
-        temporary worker by each server exec
-
+app (facade) with task list
+    worker by each task
+        worker by each exec
 
 log/yyyyddmm/task1/hhmmssmmm.json
 log/yyyyddmm/task1/hhmmssmmm/rows_0.json

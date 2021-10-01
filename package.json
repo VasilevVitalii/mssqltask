@@ -4,7 +4,7 @@
     "description": "mssql tasks",
     "main": "dist/index.js",
     "scripts": {
-        "build": "tsc",
+        "build": "tsc --build --pretty && node build.post.js",
         "test": "node ./dist/test/index.js"
     },
     "repository": {
@@ -20,16 +20,16 @@
     "dependencies": {
         "fs-extra": "^10.0.0",
         "node-schedule": "^2.0.0",
-        "vv-filestream": "0.0.4",
+        "vv-filestream": "0.0.5",
         "vv-mssql": "0.0.44",
         "vv-shared": "^5.0.4"
     },
     "devDependencies": {
         "@types/fs-extra": "^9.0.13",
-        "@types/node": "^16.9.4",
+        "@types/node": "^16.10.2",
         "@types/node-schedule": "^1.3.2",
-        "@typescript-eslint/eslint-plugin": "^4.31.1",
-        "@typescript-eslint/parser": "^4.31.1",
+        "@typescript-eslint/eslint-plugin": "^4.32.0",
+        "@typescript-eslint/parser": "^4.32.0",
         "eslint": "^7.32.0",
         "ts-node": "^10.2.1",
         "typescript": "^4.4.3"

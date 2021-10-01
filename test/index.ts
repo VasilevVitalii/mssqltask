@@ -1,10 +1,28 @@
 // import * as lib from '../src'
-// import * as data from './data'
+import * as data from './data'
+import { Task } from '../src/task'
 // import * as server from '../src/server'
 // import * as metronom from '../src/metronom'
 
 // const q = `PRINT 'Hello'; SELECT * FROM rrMasterData.dbo.Assortment /*WHERE Code = 14280*/; WAITFOR DELAY '00:00:01';SELECT * FROM rrGoodsMovement.dbo.Income`
 // //const q = `SELECT * FROM [master].sys.objects; WAITFOR DELAY '00:00:05';SELECT * FROM [master].sys.objects`
+
+const task = new Task({
+    metronom: data.metronoms()[0],
+    query: "select * from sys.objects",
+    servers: data.servers(),
+    result: {
+        allow_callback_messages: true,
+        allow_callback_rows: true
+    }
+})
+task.onError(error => {
+    console.warn(error)
+})
+task.onChanged(state => {
+    console.log(state)
+})
+task.start()
 
 // const servers = data.servers()
 // servers_ping(servers, 0, () => {

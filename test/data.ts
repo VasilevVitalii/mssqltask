@@ -10,22 +10,22 @@ export function log(): string {
     return full_path_name
 }
 
-export function servers(): server.Server[] {
+export function servers(): server.TypeServer[] {
     const full_file_name = path.join(__dirname, '..', '..', 'test', 'servers.json')
     if (!fs.existsSync(full_file_name)) {
         const servers = [
-            new server.Server({
+            {
                 instance: 'instance 1',
                 login: 'sa',
                 password: '123456789',
-            }),
-            new server.Server({
+            },
+            {
                 instance: 'instance 2',
                 login: 'sa',
                 password: '123456789',
-            }),
-        ]
-        fs.writeFileSync(full_file_name, JSON.stringify(servers.map(m => { return m.options }), null, 4), 'utf8')
+            },
+        ] as server.TypeServer[]
+        fs.writeFileSync(full_file_name, JSON.stringify(servers, null, 4), 'utf8')
         return servers
     }
 
@@ -39,7 +39,7 @@ export function servers(): server.Server[] {
         fs.writeFileSync(full_file_name, JSON.stringify(servers.map(m => { return m.options }), null, 4), 'utf8')
     }
 
-    return servers
+    return servers.map(m => { return m.options })
 }
 
 export function metronoms(): TypeMetronom[] {

@@ -7,22 +7,6 @@
         {
             "type": "node",
             "request": "launch",
-            "name": "sandbox",
-            "runtimeArgs": ["--nolazy", "-r", "ts-node/register"],
-            "sourceMaps": true,
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/**",
-                "!**/node_modules/**"
-            ],
-            "program": "${workspaceFolder}/sandbox.ts",
-            "protocol": "inspector"
-        },
-        {
-            "type": "node",
-            "request": "launch",
             "name": "test",
             "runtimeArgs": ["--nolazy", "-r", "ts-node/register"],
             "sourceMaps": true,
@@ -35,7 +19,7 @@
             ],
             "program": "${workspaceFolder}/test/index.ts",
             "protocol": "inspector",
-            "preLaunchTask": "build"
+            "preLaunchTask": "npm: build"
         }
     ]
 }

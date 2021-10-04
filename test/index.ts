@@ -9,13 +9,21 @@ import { Task } from '../src/task'
 
 const task = new Task({
     metronom: data.metronoms()[0],
-    query: "select * from sys.objects",
-    servers: data.servers(),
-    result: {
-        allow_callback_messages: true,
-        allow_callback_rows: true
+    query: "print 'hello'  --select * from sys.objects",
+    servers: [
+        // ...data.servers().map(m => { return {...m, instance: '1'}}),
+        // ...data.servers().map(m => { return {...m, instance: '2'}}),
+        // ...data.servers().map(m => { return {...m, instance: '3'}}),
+        // ...data.servers().map(m => { return {...m, instance: '4'}}),
+        // ...data.servers().map(m => { return {...m, instance: '5'}}),
+        data.servers()[0]
+    ],
+    process_result: {
+        callback_messages: true,
+        callback_rows: true
     }
 })
+task.maxWorkers = 3
 task.onError(error => {
     console.warn(error)
 })

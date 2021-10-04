@@ -1,7 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs-extra'
 import * as server from '../src/server'
-import { TypeMetronom } from '../src/metronom'
+import { TypeMetronom } from 'vv-metronom'
 
 export function log(): string {
     const full_path_name = path.join(__dirname, '..', '..', 'test', 'log')

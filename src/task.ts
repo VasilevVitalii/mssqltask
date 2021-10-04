@@ -1,17 +1,10 @@
 import path from 'path'
 import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
-import { TypeExecResult, TypeServer } from './server'
-import { TypeWorkerData, TypeWorkedResult } from './task.worker'
+import { TypeServer } from './server'
+import { TypeWorkerResult, TypeWorkerOptions } from './task.worker'
 
-export type TypeTaskResult = {
-    allow_callback_messages?: boolean
-    allow_callback_rows?: boolean,
-    allow_log_messages?: boolean,
-    allow_log_rows?: boolean,
-    log_path?: string,
-    log_key?: string
-}
+
     // {kind: 'callback', allow_tables: boolean, allow_messages: boolean} |
     // {kind: 'save', allow_tables: boolean, allow_messages: boolean, key: string, path: string}
 
@@ -19,13 +12,19 @@ export type TypeTask = {
     metronom: metronom.TypeMetronom
     servers: TypeServer[]
     query: string
-    result: TypeTaskResult
+    process_result: {
+        callback_rows?: boolean,
+        callback_messages?: boolean,
+        save_rows?: boolean,
+        save_messages?: boolean
+    }
 }
 
 export type TypeTicketResult = {
     dateStart: Date,
     dateStop: Date,
     servers: {
+        worker: number,
         instance: string,
         execSpId: number,
         execDurationMsec: number,
@@ -37,7 +36,7 @@ export type TypeTicketResult = {
 }
 
 export type TypeTaskState =
-    {kind: 'start'} |
+    {kind: 'start', usedWorkers: number} |
     {kind: 'process', ticket: TypeTicketResult} |
     {kind: 'stop'}
 
@@ -52,6 +51,7 @@ export class Task {
 
     private callback_onStateChanged: (state: TypeTaskState) => void
     private callback_onError: (error: Error) => void
+    maxWorkers: number
 
     constructor(options: TypeTask) {
         this.options = options
@@ -61,9 +61,10 @@ export class Task {
             needStop: false,
             status: 'stopped'
         }
-        this.metronom.ontick(() => {
+        this.metronom.onTick(() => {
             this.onTick()
         })
+        this.maxWorkers = this.servers.length
     }
 
     start() {
@@ -81,39 +82,70 @@ export class Task {
 
     private onTick() {
         if (this.state.status !== 'idle') return
+
+        const workerServers = this.serversToWorkerChunks()
         const ticket = {
             dateStart: new Date(),
             dateStop: undefined,
-            servers: this.servers.map(m => { return {
-                instance: m.instance,
-                execSpId: 0,
-                execDurationMsec: 0,
-                execError: '',
-                countRows: 0,
-                countMessages: 0,
-                complete: false
-            }})
+            servers: []
         } as TypeTicketResult
-        this.sendChanged({kind: 'start'})
-        this.servers.forEach((server, server_idx) => {
-            const ticket_server = ticket.servers.find(f => f.instance === server.instance)
+        workerServers.forEach((chunk, chunk_id) => {
+            chunk.forEach(item => {
+                ticket.servers.push({
+                    worker: chunk_id,
+                    instance: item.instance,
+                    execSpId: 0,
+                    execDurationMsec: 0,
+                    execError: '',
+                    countRows: 0,
+                    countMessages: 0,
+                    complete: false
+                })
+            })
+        })
+
+        this.sendChanged({kind: 'start', usedWorkers: workerServers.length})
+        workerServers.forEach((servers, servers_idx) => {
             const worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
                 workerData: {
-                    server: server,
+                    servers: servers,
                     query: this.options.query,
-                    result: this.options.result
-                } as TypeWorkedData
+                    callback: {
+                        messages: this.options.process_result.callback_messages,
+                        rows: this.options.process_result.callback_rows,
+                    },
+                    save: {
+                        full_file_name_messages: this.options.process_result.save_messages ? 'sss' : undefined,
+                        full_file_name_rows: this.options.process_result.save_rows ? 'aaa' : undefined,
+                    }
+                } as TypeWorkerOptions
             })
-            worker.on('message', (result: TypeWorkerResult) => {
-                if (result.kind === 'start') {
-                    ticket_server.execSpId = result.spid
-                }
-            })
-            worker.on('exit', () => {
-                console.log('exit')
-            })
-            console.log('aaa', server.instance, server_idx)
+
         })
+
+        // this.servers.forEach((server, server_idx) => {
+
+
+        //     // const ticket_server = ticket.servers.find(f => f.instance === server.instance)
+        //     // const worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
+        //     //     workerData: {
+        //     //         server: server,
+        //     //         query: this.options.query,
+        //     //         result: this.options.result
+        //     //     } as TypeWorkedData
+        //     // })
+        //     // worker.on('message', (result: TypeWorkerResult) => {
+        //     //     if (result.kind === 'start') {
+        //     //         ticket_server.execSpId = result.spid
+        //     //     }
+        //     // })
+        //     // worker.on('exit', () => {
+        //     //     console.log('exit')
+        //     // })
+        //     // console.log('aaa', server.instance, server_idx)
+        // })
+
+        this.metronom.allowNextTick()
     }
 
     onChanged(callback: (state: TypeTaskState) => void) {
@@ -132,6 +164,32 @@ export class Task {
     private sendError(error: Error) {
         if (!this.callback_onError || !error) return
         this.callback_onError(error)
+    }
+
+    private serversToWorkerChunks(): TypeServer[][] {
+        const maxWorkers = this.maxWorkers && this.maxWorkers > 0 ? this.maxWorkers : 1
+        if (this.servers.length <= maxWorkers) {
+            return this.servers.map(m => { return [m]})
+        }
+        const minServersInChunks = Math.floor(this.servers.length/ this.maxWorkers)
+        const chunkCapacity = [] as number[]
+        for (let i = 0; i < maxWorkers; i++) {
+            chunkCapacity.push(minServersInChunks)
+        }
+        let chunkCapacityIdx = 0
+        for (let i = maxWorkers * minServersInChunks; i < this.servers.length; i++) {
+            chunkCapacity[chunkCapacityIdx]++
+            chunkCapacityIdx++
+        }
+
+        const result = [] as TypeServer[][]
+        let chunkIdx = 0
+        chunkCapacity.forEach(cc => {
+            result.push(this.servers.slice(chunkIdx, chunkIdx + cc))
+            chunkIdx = chunkIdx + cc
+        })
+
+        return result
     }
 
     // private onTickTablesNo() {

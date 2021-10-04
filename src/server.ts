@@ -1,6 +1,5 @@
 import * as mssql from 'vv-mssql'
 import * as vvs from 'vv-shared'
-import * as vvfs from 'vv-filestream'
 
 export type TypeServer = {
     instance: string,
@@ -13,10 +12,16 @@ export type TypeMessage = {
     type: 'info' | 'error'
 }
 
+export type TypeRow = {
+    table_index: number
+    rows: any[]
+}
+
 export type TypeExecResult =
     {kind: 'start', spid: number} |
-    {kind: 'chunk', table_index: number, row_list: any[], messages: TypeMessage[]} |
-    {kind: 'stop', duration: number, error: Error, messages: TypeMessage[]}
+    {kind: 'rows', data: TypeRow[]} |
+    {kind: 'messages', data: TypeMessage[]} |
+    {kind: 'stop', duration: number, error: Error}
 
 // export type TypeExecResultToFile =
 //     {kind: 'start', spid: number} |
@@ -52,8 +57,8 @@ export class Server {
         this.spid = 0
     }
 
-    exec(query: string, allow_tables: boolean, callback: (result: TypeExecResult) => void) {
-        this.server.exec(query, {allow_tables: allow_tables, database: 'master', get_spid: true, stop_on_error: true, chunk: {type: 'msec', chunk: 500}}, exec_result => {
+    exec(query: string, allow_rows: boolean, allow_messages: boolean, callback: (result: TypeExecResult) => void) {
+        this.server.exec(query, {allow_tables: allow_rows, database: 'master', get_spid: true, stop_on_error: true, chunk: {type: 'msec', chunk: 500}}, exec_result => {
             if (exec_result.type === 'spid') {
                 this.spid = exec_result.spid || 0
                 callback({
@@ -63,21 +68,41 @@ export class Server {
                 return
             }
             if (exec_result.type === 'chunk') {
-                callback({
-                    kind: 'chunk',
-                    table_index: exec_result.chunk?.table?.table_index || -1,
-                    row_list: exec_result.chunk?.table?.row_list || [],
-                    messages: exec_result.chunk?.message_list?.map(m => { return {text: m.message, type: m.type} }) || []
-                })
+                if (exec_result.chunk.table.row_list.length > 0) {
+                    callback({
+                        kind: 'rows',
+                        data: [{
+                            table_index: exec_result.chunk.table.table_index,
+                            rows: exec_result.chunk.table.row_list
+                        }]
+                    })
+                }
+                if (exec_result.chunk.message_list.length > 0) {
+                    callback({
+                        kind: 'messages',
+                        data: exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
+                    })
+                }
                 return
             }
             if (exec_result.type === 'end') {
                 this.spid = 0
+                if (exec_result.end.table_list.length > 0) {
+                    callback({
+                        kind: 'rows',
+                        data: exec_result.end.table_list.map(m => { return {table_index: m.table_index, rows: m.row_list} })
+                    })
+                }
+                if (exec_result.end.message_list.length > 0) {
+                    callback({
+                        kind: 'messages',
+                        data: exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
+                    })
+                }
                 callback({
                     kind: 'stop',
-                    duration: exec_result.end?.duration || 0,
-                    error: exec_result.end?.error,
-                    messages: exec_result.end?.message_list?.map(m => { return {text: m.message, type: m.type} }) || []
+                    duration: exec_result.end.duration || 0,
+                    error: exec_result.end.error
                 })
                 return
             }

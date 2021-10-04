@@ -96,12 +96,12 @@ export class Server {
                 if (exec_result.end.message_list.length > 0) {
                     callback({
                         kind: 'messages',
-                        data: exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
+                        data: exec_result.end.message_list.map(m => { return {text: m.message, type: m.type} })
                     })
                 }
                 callback({
                     kind: 'stop',
-                    duration: exec_result.end.duration || 0,
+                    duration: Math.round(exec_result.end.duration || 0),
                     error: exec_result.end.error
                 })
                 return

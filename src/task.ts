@@ -24,6 +24,7 @@ export type TypeTicketResult = {
     dateStart: Date,
     dateStop: Date,
     servers: {
+        idx: string,
         worker: number,
         instance: string,
         execSpId: number,
@@ -31,7 +32,8 @@ export type TypeTicketResult = {
         execError: string,
         countRows: number,
         countMessages: number,
-        complete: boolean
+        fileRows: string,
+        fileMessages: string,
     }[]
 }
 
@@ -92,6 +94,7 @@ export class Task {
         workerServers.forEach((chunk, chunk_id) => {
             chunk.forEach(item => {
                 ticket.servers.push({
+                    idx: 'aaaa',
                     worker: chunk_id,
                     instance: item.instance,
                     execSpId: 0,
@@ -99,7 +102,8 @@ export class Task {
                     execError: '',
                     countRows: 0,
                     countMessages: 0,
-                    complete: false
+                    fileMessages: undefined,
+                    fileRows: undefined
                 })
             })
         })

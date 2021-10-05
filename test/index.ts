@@ -8,6 +8,7 @@ import { Task } from '../src/task'
 // //const q = `SELECT * FROM [master].sys.objects; WAITFOR DELAY '00:00:05';SELECT * FROM [master].sys.objects`
 
 const task = new Task({
+    key: 'task1',
     metronom: data.metronoms()[0],
     query: "print 'hello'  --select * from sys.objects",
     servers: [
@@ -19,16 +20,16 @@ const task = new Task({
         data.servers()[0]
     ],
     process_result: {
-        callback_messages: true,
-        callback_rows: true
+        allow_callback_messages: true,
+        allow_callback_rows: true
     }
 })
 task.maxWorkers = 3
 task.onError(error => {
-    console.warn(error)
+    //console.warn(error)
 })
 task.onChanged(state => {
-    console.log(state)
+    //console.log(state)
 })
 task.start()
 

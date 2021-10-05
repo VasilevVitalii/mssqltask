@@ -1,91 +1,90 @@
-import { resolveNaptr } from 'dns'
 import * as filestream from 'vv-filestream'
 import { workerData, parentPort } from 'worker_threads'
 import { Server, TypeMessage, TypeServer } from "./server"
-import { full_file_names } from './z'
+
+export type TypeServerWorker = TypeServer & {
+    idxs: string,
+    full_file_name_rows: string,
+    full_file_name_messages: string,
+    allow_callback_rows: boolean,
+    allow_callback_messages: boolean
+}
 
 export type TypeWorkerOptions = {
-    servers: TypeServer[],
-    query: string,
-    callback: {
-        rows: boolean,
-        messages: boolean
-    },
-    save: {
-        full_file_name_rows: string,
-        full_file_name_messages: string
-    }
+    servers: TypeServerWorker[],
+    query: string
 }
 
 export type TypeWorkerResult =
-    {kind: 'start', spid: number} |
-    {kind: 'messages', data: TypeMessage[], count: number} |
-    {kind: 'rows', data: any[], count: number} |
-    {kind: 'stop'}
+    {kind: 'start', idxs: string, spid: number} |
+    {kind: 'messages', idxs: string, data: TypeMessage[], count: number} |
+    {kind: 'rows', idxs: string, data: any[], count: number} |
+    {kind: 'stop', idxs: string, duration: number, error: string} |
+    {kind: 'end', errors: string[]}
 
 const env = {
-    options: workerData as TypeWorkerOptions
+    options: workerData as TypeWorkerOptions,
+    complete_idxs: [] as string[]
 }
 
-const allow_messages = env.options.callback.messages || (env.options.save.full_file_name_messages ? true : false)
-const allow_rows = env.options.callback.rows || (env.options.save.full_file_name_rows ? true : false)
-
-env.options.servers.forEach(server => {
-    (new Server(server, 'mssqltask')).exec(env.options.query, allow_rows, allow_messages, result => {
-        console.log('worker result', result)
-    })
+const stream = filestream.createWriteStream({prefix: '[\n', suffix: '{}\n]'})
+stream.onClose(result => {
+    parentPort.postMessage({
+        kind: 'end',
+        errors: result.filter(f => f.error). map(m => { return m.error.message })
+    } as TypeWorkerResult)
+    return
 })
 
-console.log('worker')
-
-// const server = new Server(env.workedData.server, 'mssqltask')
-// const file_names = full_file_names(env.workedData.result.log_path, env.workedData.result.log_key)
-// const stream = filestream.createWriteStream({prefix: '[\n', suffix: '{}\n]'})
-// stream.onClose(result => {
-//     parentPort.postMessage({
-//         kind: 'stop'
-//     } as TypeWorkerResult)
-// })
-
-// server.exec(env.workedData.query, env.workedData.result.allow_callback_rows || env.workedData.result.allow_log_rows, result => {
-//     if (result.kind === 'start') {
-//         parentPort.postMessage({
-//             kind: 'start',
-//             spid: result.spid
-//         } as TypeWorkerResult)
-//         return
-//     }
-//     if (result.kind === 'chunk') {
-//         if (env.workedData.result.allow_log_rows && result.row_list.length > 0) {
-//             stream.write({fullFileName: file_names.rows, data: result.row_list})
-//         }
-//         if (env.workedData.result.allow_log_messages && result.messages.length > 0) {
-//             stream.write({fullFileName: file_names.messages, data: result.messages})
-//         }
-//     }
-//     if (result.kind === 'stop') {
-//         stream.close()
-//         return
-//     }
-// })
-
-// console.log(env)
-
-//import { TypeServer } from "./task";
-
-// export function run(servers: TypeServer, query: string, fileNameSuffix: string, fileNameSuffixStartIdx: number | undefined) {
-
-// }
-
-// export class TaskRun {
-
-//     private servers: TypeServer
-
-//     constructor(servers: TypeServer, query: string, fileNameSuffix: string, fileNameSuffixStartIdx: number | undefined) {
-//         this.servers = servers
-
-//     }
-
-// }
-
-//console.log('worker!')
+env.options.servers.forEach(server => {
+    const allow_messages = server.allow_callback_messages || (server.full_file_name_messages ? true : false)
+    const allow_rows = server.allow_callback_rows || (server.full_file_name_rows ? true : false)
+    const s = new Server(server, 'mssqltask')
+    s.exec(env.options.query, allow_rows, allow_messages, result => {
+        if (result.kind === 'start') {
+            parentPort.postMessage({
+                kind: 'start',
+                idxs: server.idxs,
+                spid: result.spid
+            } as TypeWorkerResult)
+            return
+        }
+        if (result.kind === 'rows') {
+            if (server.full_file_name_rows) {
+                stream.write({fullFileName: server.full_file_name_rows, data: result.data})
+            }
+            parentPort.postMessage({
+                kind: 'rows',
+                idxs: server.idxs,
+                count: result.data.length,
+                data: server.allow_callback_rows ? result.data : []
+            } as TypeWorkerResult)
+            return
+        }
+        if (result.kind === 'messages') {
+            if (server.full_file_name_messages) {
+                stream.write({fullFileName: server.full_file_name_messages, data: result.data})
+            }
+            parentPort.postMessage({
+                kind: 'messages',
+                idxs: server.idxs,
+                count: result.data.length,
+                data: server.allow_callback_messages ? result.data : []
+            } as TypeWorkerResult)
+            return
+        }
+        if (result.kind === 'stop') {
+            parentPort.postMessage({
+                kind: 'stop',
+                idxs: server.idxs,
+                duration: result.duration,
+                error: result.error ? result.error.message : ''
+            } as TypeWorkerResult)
+            env.complete_idxs.push(server.idxs)
+            if (env.options.servers.every(f => env.complete_idxs.includes(f.idxs))) {
+                stream.close()
+            }
+            return
+        }
+    })
+})

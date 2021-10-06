@@ -14,23 +14,17 @@ export type TypeMessage = {
 
 export type TypeRow = {
     table_index: number
-    rows: any[]
+    row: any
 }
+
+export type TypeExecResultRows = {kind: 'rows', data: TypeRow[]}
+export type TypeExecResultMessages = {kind: 'messages', data: TypeMessage[]}
 
 export type TypeExecResult =
     {kind: 'start', spid: number} |
-    {kind: 'rows', data: TypeRow[]} |
-    {kind: 'messages', data: TypeMessage[]} |
+    TypeExecResultRows |
+    TypeExecResultMessages |
     {kind: 'stop', duration: number, error: Error}
-
-// export type TypeExecResultToFile =
-//     {kind: 'start', spid: number} |
-//     {kind: 'stop', duration: number, error: Error}
-
-// export type TypeExecResultToSend =
-//     {kind: 'start', spid: number} |
-//     {kind: 'process', table_index: number, table_rows: any[], messages: TypeMessage[]} |
-//     {kind: 'stop', duration: number, error: Error}
 
 export class Server {
     private server: mssql.app
@@ -71,10 +65,11 @@ export class Server {
                 if (exec_result.chunk.table.row_list.length > 0) {
                     callback({
                         kind: 'rows',
-                        data: [{
-                            table_index: exec_result.chunk.table.table_index,
-                            rows: exec_result.chunk.table.row_list
-                        }]
+                        data: exec_result.chunk.table.row_list.map(m => { return {table_index: exec_result.chunk.table.table_index, row: m} })
+                        // [{
+                        //     table_index: exec_result.chunk.table.table_index,
+                        //     rows: exec_result.chunk.table.row_list
+                        // }]
                     })
                 }
                 if (exec_result.chunk.message_list.length > 0) {
@@ -87,10 +82,10 @@ export class Server {
             }
             if (exec_result.type === 'end') {
                 this.spid = 0
-                if (exec_result.end.table_list.length > 0) {
+                if (exec_result.end.table_list.some(f => f.row_list.length > 0)) {
                     callback({
                         kind: 'rows',
-                        data: exec_result.end.table_list.map(m => { return {table_index: m.table_index, rows: m.row_list} })
+                        data: exec_result.end.table_list.filter(f => f.row_list.length > 0).map(m => { return {table_index: m.table_index, rows: m.row_list} })
                     })
                 }
                 if (exec_result.end.message_list.length > 0) {

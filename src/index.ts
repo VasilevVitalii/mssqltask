@@ -1,24 +1,57 @@
 //import worker_threads from 'worker_threads'
 
+import * as path from 'path'
 import worker_threads from 'worker_threads'
+import { TypeWorkerCommand, TypeWorkerResult } from './index.worker'
+import { TypeTask, TypeTaskState } from './task'
 
 export interface IApp {
     start(): void,
+    stop(): void,
+    onError(callback:(error: string) => void): void,
+    onChanged(callback:(state: TypeTaskState) => void): void
 }
 
-export function create(callback?: (error: Error | undefined) => void): IApp {
-    try {
-        return {
-            start: () => {},
+export function createTask(options: TypeTask): IApp {
+    const worker = new worker_threads.Worker(path.join(__dirname, 'index.worker.js'), {
+        workerData: options
+    })
+    worker.on('message', (result: TypeWorkerResult) => {
+        switch (result.kind) {
+            case 'state':
+                if (callback_onChanged) {
+                    callback_onChanged(result.state)
+                }
+                break
+            case 'error': {
+                if (callback_onError) {
+                    callback_onError(result.error)
+                }
+                break
+            }
+            default: {
+                if (callback_onError) {
+                    callback_onError(`unknown TypeWorkerResult ${result}`)
+                }
+            }
         }
-    } catch (error) {
-        if (typeof callback === 'function') {
-            callback(error as Error)
-        } else {
-            throw error
-        }
-        return {
-            start: () => {},
+    })
+
+    let callback_onError = undefined as (error: string) => void
+    let callback_onChanged = undefined as (state: TypeTaskState) => void
+
+    return {
+        start: () => {
+            worker.postMessage({kind: 'start'} as TypeWorkerCommand)
+        },
+        stop: () => {
+            worker.postMessage({kind: 'stop'} as TypeWorkerCommand)
+        },
+        onError: (callback) => {
+            callback_onError = callback
+        },
+        onChanged: (callback) => {
+            callback_onChanged = callback
         }
     }
 }

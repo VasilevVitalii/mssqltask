@@ -28,10 +28,12 @@ const env = {
     options: workerData as TypeWorkerOptions,
     complete_idxs: [] as string[],
     errors: [] as string[],
-    server_results: [] as {server: TypeServerWorker, result: TypeExecResult}[]
+    server_results: [] as {server: TypeServerWorker, result: TypeExecResult}[],
+    server_idxs_write_rows: [] as string[],
+    server_idxs_write_messages: [] as string[]
 }
 
-const stream = filestream.createWriteStream({prefix: '[\n', suffix: '{}\n]'})
+const stream = filestream.createWriteStream({prefix: '[\n', suffix: '\n]'})
 stream.onClose(result => {
     parentPort.postMessage({
         kind: 'end',
@@ -52,7 +54,7 @@ env.options.servers.forEach(server => {
 let timer_server_result = setTimeout(function tick() {
     const server_result = env.server_results.shift()
     if (!server_result) {
-        timer_server_result = setTimeout(tick, 200)
+        timer_server_result = setTimeout(tick, 100)
         return
     }
     const server = server_result.server
@@ -63,12 +65,15 @@ let timer_server_result = setTimeout(function tick() {
             idxs: server.idxs,
             spid: result.spid
         } as TypeWorkerResult)
-        timer_server_result = setTimeout(tick, 100)
+        timer_server_result = setTimeout(tick, 10)
         return
     }
     if (result.kind === 'rows') {
         if (server.full_file_name_rows) {
-            stream.write({fullFileName: server.full_file_name_rows, data: result.data})
+            if (!env.server_idxs_write_rows.some(f => f === server.idxs)) {
+                env.server_idxs_write_rows.push(server.idxs)
+            }
+            stream.write({fullFileName: server.full_file_name_rows, data: result.data.map(m => {return {kind: 'row', table_index: m.table_index, row: m.row}})})
         }
         parentPort.postMessage({
             kind: 'rows',
@@ -76,12 +81,15 @@ let timer_server_result = setTimeout(function tick() {
             count: result.data.length,
             data: server.allow_callback_rows ? result.data : []
         } as TypeWorkerResult)
-        timer_server_result = setTimeout(tick, 100)
+        timer_server_result = setTimeout(tick, 10)
         return
     }
     if (result.kind === 'messages') {
         if (server.full_file_name_messages) {
-            stream.write({fullFileName: server.full_file_name_messages, data: result.data})
+            if (!env.server_idxs_write_messages.some(f => f === server.idxs)) {
+                env.server_idxs_write_messages.push(server.idxs)
+            }
+            stream.write({fullFileName: server.full_file_name_messages, data: result.data.map(m => { return {kind: 'message', ...m} })})
         }
         parentPort.postMessage({
             kind: 'messages',
@@ -90,7 +98,7 @@ let timer_server_result = setTimeout(function tick() {
             data: server.allow_callback_messages ? result.data : []
         } as TypeWorkerResult)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        timer_server_result = setTimeout(tick, 100)
+        timer_server_result = setTimeout(tick, 10)
         return
     }
     if (result.kind === 'stop') {
@@ -102,6 +110,14 @@ let timer_server_result = setTimeout(function tick() {
         } as TypeWorkerResult)
         env.complete_idxs.push(server.idxs)
         if (env.options.servers.every(f => env.complete_idxs.includes(f.idxs))) {
+            env.options.servers.forEach(server => {
+                if (env.server_idxs_write_rows.some(f => f === server.idxs)) {
+                    stream.write({fullFileName: server.full_file_name_rows, data: JSON.stringify({kind: 'server', server_idxs: server.idxs, server_instance: server.instance})})
+                }
+                if (env.server_idxs_write_messages.some(f => f === server.idxs)) {
+                    stream.write({fullFileName: server.full_file_name_messages, data: JSON.stringify({kind: 'server', server_idxs: server.idxs, server_instance: server.instance})})
+                }
+            })
             stream.close()
         }
         return

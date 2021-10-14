@@ -14,7 +14,7 @@ export type TTask = {
     processResult: {
         allowCallbackRows?: boolean,
         allowCallbackMessages?: boolean,
-        pastSaveTickets?: string,
+        pathSaveTickets?: string,
         pathSaveRows?: string,
         pathSaveMessages?: string
     }
@@ -255,7 +255,7 @@ export class Task {
         if (this._servers.length <= maxWorkers) {
             result.push(...this._servers.map(m => { return [m]}))
         } else {
-            const minServersInChunks = Math.floor(this._servers.length/ this.maxWorkers)
+            const minServersInChunks = Math.floor(this._servers.length/ maxWorkers)
             const chunkCapacity = [] as number[]
             for (let i = 0; i < maxWorkers; i++) {
                 chunkCapacity.push(minServersInChunks)
@@ -276,7 +276,7 @@ export class Task {
         const fileSuffix = `${this._options.key}.${vv.dateFormat(dd, 'yyyymmdd.hhmissmsec')}`
 
         return {
-            fullFileNameTickets: this._options.processResult.pastSaveTickets ? path.join(this._options.processResult.pastSaveTickets, pathPrefix, `t.${fileSuffix}.json`) : undefined,
+            fullFileNameTickets: this._options.processResult.pathSaveTickets ? path.join(this._options.processResult.pathSaveTickets, pathPrefix, `t.${fileSuffix}.json`) : undefined,
             serverWorkers: result.map(m => { return m.map(mm => { return {
                 ...mm,
                 fullFileNameRows: this._options.processResult.pathSaveRows ? path.join(this._options.processResult.pathSaveRows, pathPrefix, 'row', `r.${fileSuffix}.${mm.idxs}.json`) : undefined,

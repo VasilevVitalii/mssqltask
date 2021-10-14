@@ -8,7 +8,8 @@ export type TServerWorker = TServer & {
     fullFileNameRows: string,
     fullFileNameMessages: string,
     allowCallbackRows: boolean,
-    allowCallbackMessages: boolean
+    allowCallbackMessages: boolean,
+    isComplete?: boolean
 }
 
 export type TWorkerOptions = {
@@ -25,7 +26,6 @@ export type TWorkerResult =
 
 const env = {
     options: workerData as TWorkerOptions,
-    complete_idxs: [] as string[],
     errors: [] as string[],
     server_results: [] as {server: TServerWorker, result: TExecResult}[]
 }
@@ -36,7 +36,6 @@ stream.onClose(result => {
         kind: 'end',
         errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
     } as TWorkerResult)
-    return
 })
 
 env.options.servers.forEach(server => {
@@ -88,7 +87,6 @@ let timerServerResult = setTimeout(function tick() {
             count: result.data.length,
             data: server.allowCallbackMessages ? result.data : []
         } as TWorkerResult)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         timerServerResult = setTimeout(tick, 50)
         return
     }
@@ -103,10 +101,7 @@ let timerServerResult = setTimeout(function tick() {
             }
         }
 
-        env.complete_idxs.push(server.idxs)
-        if (env.options.servers.every(f => env.complete_idxs.includes(f.idxs))) {
-            stream.close()
-        }
+        server.isComplete = true
 
         parentPort.postMessage({
             kind: 'stop',
@@ -114,6 +109,13 @@ let timerServerResult = setTimeout(function tick() {
             duration: result.duration,
             error: result.error ? result.error.message : ''
         } as TWorkerResult)
+
+        if (env.options.servers.every(f => f.isComplete === true)) {
+            stream.close()
+        } else {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            timerServerResult = setTimeout(tick, 50)
+        }
         return
     }
 }, 100)

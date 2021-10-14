@@ -2,29 +2,29 @@ import path from 'path'
 import fs from 'fs-extra'
 import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
-import * as vvs from 'vv-shared'
-import { TypeServer, TypeMessage } from './server'
-import { TypeWorkerResult, TypeWorkerOptions, TypeServerWorker } from './task.worker'
+import * as vv from 'vv-common'
+import { TServer, TMessage } from './server'
+import { TWorkerResult, TWorkerOptions, TServerWorker } from './task.worker'
 
-export type TypeTask = {
+export type TTask = {
     key: string
     metronom: metronom.TypeMetronom
-    servers: TypeServer[]
+    servers: TServer[]
     query: string
-    process_result: {
-        allow_callback_rows?: boolean,
-        allow_callback_messages?: boolean,
-        path_save_rows?: string,
-        path_save_messages?: string,
-        path_save_tickets?: string
+    processResult: {
+        allowCallbackRows?: boolean,
+        allowCallbackMessages?: boolean,
+        pastSaveTickets?: string,
+        pathSaveRows?: string,
+        pathSaveMessages?: string
     }
 }
 
-export type TypeServerTask = TypeServer & {
+export type TServerTask = TServer & {
     idxs: string
 }
 
-export type TypeTicketResult = {
+export type TTicketResult = {
     dateStart: Date,
     dateStop: Date,
     countWorkers: number
@@ -37,87 +37,93 @@ export type TypeTicketResult = {
         execDurationMsec: number,
         execError: string,
         rows: any[],
-        messages: TypeMessage[],
+        messages: TMessage[],
         countRows: number,
         countMessages: number,
     }[]
 }
 
-export type TypeTaskState =
-    {kind: 'start', usedWorkers: number, ticket: TypeTicketResult} |
-    {kind: 'process', ticket: TypeTicketResult} |
+export type TTaskState =
+    {kind: 'start', usedWorkers: number, ticket: TTicketResult} |
+    {kind: 'process', ticket: TTicketResult} |
     {kind: 'stop.worker'} |
-    {kind: 'stop', ticket: TypeTicketResult}
+    {kind: 'stop', ticket: TTicketResult}
 
 export class Task {
-    private options: TypeTask
-    private metronom: metronom.Metronom
-    private servers: TypeServerTask[]
-    private state: {
+    private _options: TTask
+    private _metronom: metronom.Metronom
+    private _servers: TServerTask[]
+    private _state: {
         command: 'needStart' | 'needStop' | undefined
         status: ('idle' | 'buzy' | 'stopped')
     }
 
-    private callback_onStateChanged: (state: TypeTaskState) => void
-    private callback_onError: (error: Error) => void
+    private _callbackOnStateChanged: (state: TTaskState) => void
+    private _callbackOnStop: () => void
+    private _callbackOnError: (error: Error) => void
     maxWorkers: number
 
-    constructor(options: TypeTask) {
-        this.options = options
-        this.metronom = metronom.CreateMetronom(this.options.metronom)
-        this.servers = this.options.servers.map((m,i) => { return {...m, idxs: `${i > 99 ? '' : i > 9 ? '0' : '00'}${i}`} })
+    constructor(options: TTask) {
+        this._options = options
+        this._metronom = metronom.Create(this._options.metronom)
+        this._servers = this._options.servers.map((m,i) => { return {...m, idxs: `${i > 99 ? '' : i > 9 ? '0' : '00'}${i}`} })
 
-        this.state = {
+        this._state = {
             command: undefined,
             status: 'stopped'
         }
-        this.metronom.onTick(() => {
-            this.onTick()
+        this._metronom.onTick(() => {
+            this._onTick()
         })
-        this.maxWorkers = this.servers.length
-        this.metronom.start()
+        this.maxWorkers = this._servers.length
+        this._metronom.start()
     }
 
     start() {
-        this.state.command = 'needStart'
+        this._state.command = 'needStart'
     }
 
-    stop() {
-        this.state.command = 'needStop'
+    stop(callback?: () => void) {
+        this._state.command = 'needStop'
+        this._callbackOnStop = callback
     }
 
-    private onTick() {
-        if (this.state.status === 'buzy') {
-            this.metronom.allowNextTick()
+    private _onTick() {
+        if (this._state.status === 'buzy') {
+            this._metronom.allowNextTick()
             return
         }
 
-        if (this.state.command === 'needStart') {
-            this.state.status = 'idle'
-            this.state.command = undefined
-        } else if (this.state.command === 'needStop') {
-            this.state.status = 'stopped'
-            this.state.command = undefined
+        if (this._state.command === 'needStart') {
+            this._state.status = 'idle'
+            this._state.command = undefined
+        } else if (this._state.command === 'needStop') {
+            this._state.status = 'stopped'
+            this._state.command = undefined
+            if (this._callbackOnStop) {
+                this._callbackOnStop()
+                this._callbackOnStop = undefined
+            }
         }
 
-        if (this.state.status !== 'idle') {
-            this.metronom.allowNextTick()
+        if (this._state.status !== 'idle') {
+            this._metronom.allowNextTick()
             return
         }
-        this.state.status = 'buzy'
+        this._state.status = 'buzy'
 
-        const servers_workers = this.serversWorkers()
+        const chunks = this._serversToWorkerChunks()
         const ticket = {
             dateStart: new Date(),
             dateStop: undefined,
-            countWorkers: servers_workers.items.length,
+            countWorkers: chunks.serverWorkers.length,
             servers: []
-        } as TypeTicketResult
-        servers_workers.items.forEach((chunk, chunk_id) => {
+        } as TTicketResult
+        chunks.serverWorkers.forEach((chunk, chunkId) => {
             chunk.forEach(item => {
                 ticket.servers.push({
                     idxs: item.idxs,
-                    workerId: chunk_id,
+                    workerId: chunkId,
                     instance: item.instance,
                     state: 'idle',
                     execSpId: 0,
@@ -131,171 +137,153 @@ export class Task {
             })
         })
 
-        const worker_results = [] as TypeWorkerResult[]
-        const worker_results_complete_idxs = [] as string[]
-        // eslint-disable-next-line @typescript-eslint/no-this-alias
-        const self = this
-        let worker_results_timer = setTimeout(function tick () {
-            const result = worker_results.shift()
-            if (!result) {
-                worker_results_timer = setTimeout(tick, 100)
-                return
-            }
-            if (result.kind === 'start') {
-                const ticket_server = ticket.servers.find(f => f.idxs === result.idxs)
-                if (ticket_server) {
-                    ticket_server.state = 'process'
-                    ticket_server.execSpId = result.spid
-                }
-                self.sendChanged({kind: 'process', ticket: ticket})
-                worker_results_timer = setTimeout(tick, 10)
-                return
-            }
+        const completeIdx = [] as number[]
 
-            if (result.kind === 'rows') {
-                const ticket_server = ticket.servers.find(f => f.idxs === result.idxs)
-                if (ticket_server) {
-                    ticket_server.countRows = ticket_server.countRows + result.count
-                    ticket_server.rows.push(...result.data)
-                }
-                self.sendChanged({kind: 'process', ticket: ticket})
-                worker_results_timer = setTimeout(tick, 10)
-                return
-            }
-
-            if (result.kind === 'messages') {
-                const ticket_server = ticket.servers.find(f => f.idxs === result.idxs)
-                if (ticket_server) {
-                    ticket_server.countMessages = ticket_server.countMessages + result.count
-                    ticket_server.messages.push(...result.data)
-                }
-                self.sendChanged({kind: 'process', ticket: ticket})
-                worker_results_timer = setTimeout(tick, 10)
-                return
-            }
-
-            if (result.kind === 'stop') {
-                const ticket_server = ticket.servers.find(f => f.idxs === result.idxs)
-                if (ticket_server) {
-                    ticket_server.execError = result.error
-                    ticket_server.execDurationMsec = result.duration
-                    ticket_server.state = 'stop'
-                }
-                self.sendChanged({kind: 'process', ticket: ticket})
-                worker_results_timer = setTimeout(tick, 10)
-                return
-            }
-
-            if (result.kind === 'end') {
-                self.sendChanged({kind: 'stop.worker'})
-                result.errors.forEach(error_message => {
-                    self.sendError(new Error (error_message))
-                })
-                worker_results_complete_idxs.push('XXX')
-                if (worker_results_complete_idxs.length === servers_workers.items.length) {
-                    ticket.dateStop = new Date()
-                    self.sendChanged({kind: 'stop', ticket: ticket})
-                    self.state.status = 'idle'
-                    self.metronom.allowNextTick()
-                    if (servers_workers.full_file_name_tickets) {
-                        fs.ensureDir(path.parse(servers_workers.full_file_name_tickets).dir, () => {
-                            fs.writeFile(servers_workers.full_file_name_tickets, JSON.stringify({
-                                dateStart: vvs.formatDate(ticket.dateStart, 126),
-                                dateStop: vvs.formatDate(ticket.dateStop, 126),
-                                countWorkers: ticket.countWorkers,
-                                servers: ticket.servers.map(m => { return {
-                                    idxs: m.idxs,
-                                    instance: m.instance,
-                                    workerId: m.workerId,
-                                    execSpId: m.execSpId,
-                                    execDurationMsec: m.execDurationMsec,
-                                    execError: m.execError,
-                                    countRows: m.countRows,
-                                    countMessages: m.countMessages
-                                } })
-                            }, null, 4), {encoding: 'utf8'}, error => {
-                                if (error) {
-                                    self.sendError(error)
-                                }
-                            })
-                        })
-                    }
-                } else {
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    worker_results_timer = setTimeout(tick, 10)
-                }
-                return
-            }
-        }, 100)
-
-        this.sendChanged({kind: 'start', usedWorkers: servers_workers.items.length, ticket: ticket})
-        servers_workers.items.forEach((servers, i) => {
+        this._sendChanged({kind: 'start', usedWorkers: ticket.countWorkers, ticket: ticket})
+        chunks.serverWorkers.forEach((servers, serversIdx) => {
             const worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
                 workerData: {
                     servers: servers,
-                    query: this.options.query
-                } as TypeWorkerOptions
+                    query: this._options.query
+                } as TWorkerOptions
             })
-            worker.on('message', (result: TypeWorkerResult) => {
-                worker_results.push(result)
+            worker.on('message', (result: TWorkerResult) => {
+                if (result.kind === 'start') {
+                    const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
+                    if (ticketServer) {
+                        ticketServer.state = 'process'
+                        ticketServer.execSpId = result.spid
+                    }
+                    this._sendChanged({kind: 'process', ticket: ticket})
+                    return
+                }
+
+                if (result.kind === 'rows') {
+                    const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
+                    if (ticketServer) {
+                        ticketServer.countRows = ticketServer.countRows + result.count
+                        ticketServer.rows.push(...result.data)
+                    }
+                    this._sendChanged({kind: 'process', ticket: ticket})
+                    return
+                }
+
+                if (result.kind === 'messages') {
+                    const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
+                    if (ticketServer) {
+                        ticketServer.countMessages = ticketServer.countMessages + result.count
+                        ticketServer.messages.push(...result.data)
+                    }
+                    this._sendChanged({kind: 'process', ticket: ticket})
+                    return
+                }
+
+                if (result.kind === 'stop') {
+                    const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
+                    if (ticketServer) {
+                        ticketServer.execError = result.error
+                        ticketServer.execDurationMsec = result.duration
+                        ticketServer.state = 'stop'
+                    }
+                    this._sendChanged({kind: 'process', ticket: ticket})
+                    return
+                }
+
+                if (result.kind === 'end') {
+                    this._sendChanged({kind: 'stop.worker'})
+                    result.errors.forEach(errorMessage => {
+                        this._sendError(new Error (errorMessage))
+                    })
+                    completeIdx.push(serversIdx)
+                    if (completeIdx.length === ticket.countWorkers) {
+                        ticket.dateStop = new Date()
+                        this._sendChanged({kind: 'stop', ticket: ticket})
+                        if (chunks.fullFileNameTickets) {
+                            fs.ensureDir(path.parse(chunks.fullFileNameTickets).dir, error => {
+                                if (error) {
+                                    this._sendError(error)
+                                }
+                                fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
+                                    ...ticket,
+                                    servers: ticket.servers.map(m => { return {
+                                        idxs: m.idxs,
+                                        instance: m.instance,
+                                        workerId: m.workerId,
+                                        execSpId: m.execSpId,
+                                        execDurationMsec: m.execDurationMsec,
+                                        execError: m.execError,
+                                        countRows: m.countRows,
+                                        countMessages: m.countMessages
+                                    }})
+                                }, null, 4), 'utf8', error => {
+                                    if (error) {
+                                        this._sendError(error)
+                                    }
+                                })
+                            })
+                        }
+                        this._state.status = 'idle'
+                        this._metronom.allowNextTick()
+                    }
+                    return
+                }
             })
         })
     }
 
-    onChanged(callback: (state: TypeTaskState) => void) {
-        this.callback_onStateChanged = callback
+    onChanged(callback: (state: TTaskState) => void) {
+        this._callbackOnStateChanged = callback
     }
 
-    private sendChanged(state: TypeTaskState) {
-        if (!this.callback_onStateChanged) return
-        this.callback_onStateChanged(state)
+    private _sendChanged(state: TTaskState) {
+        if (!this._callbackOnStateChanged) return
+        this._callbackOnStateChanged(state)
     }
 
     onError(callback: (error: Error) => void) {
-        this.callback_onError = callback
+        this._callbackOnError = callback
     }
 
-    private sendError(error: Error) {
-        if (!this.callback_onError || !error) return
-        this.callback_onError(error)
+    private _sendError(error: Error) {
+        if (!this._callbackOnError || !error) return
+        this._callbackOnError(error)
     }
 
-    private serversWorkers(): {full_file_name_tickets: string, items: TypeServerWorker[][]} {
-        const result = [] as TypeServerTask[][]
+    private _serversToWorkerChunks(): {fullFileNameTickets: string, serverWorkers: TServerWorker[][]} {
+        const result = [] as TServerTask[][]
         const maxWorkers = this.maxWorkers && this.maxWorkers > 0 ? this.maxWorkers : 1
-        if (this.servers.length <= maxWorkers) {
-            result.push(...this.servers.map(m => { return [m]}))
+        if (this._servers.length <= maxWorkers) {
+            result.push(...this._servers.map(m => { return [m]}))
         } else {
-            const minServersInChunks = Math.floor(this.servers.length/ this.maxWorkers)
+            const minServersInChunks = Math.floor(this._servers.length/ this.maxWorkers)
             const chunkCapacity = [] as number[]
             for (let i = 0; i < maxWorkers; i++) {
                 chunkCapacity.push(minServersInChunks)
             }
             let chunkCapacityIdx = 0
-            for (let i = maxWorkers * minServersInChunks; i < this.servers.length; i++) {
+            for (let i = maxWorkers * minServersInChunks; i < this._servers.length; i++) {
                 chunkCapacity[chunkCapacityIdx]++
                 chunkCapacityIdx++
             }
             let chunkIdx = 0
             chunkCapacity.forEach(cc => {
-                result.push(this.servers.slice(chunkIdx, chunkIdx + cc))
+                result.push(this._servers.slice(chunkIdx, chunkIdx + cc))
                 chunkIdx = chunkIdx + cc
             })
         }
-
         const dd = new Date()
-        const path_prefix = path.join(vvs.formatDate(dd, 112), this.options.key)
-        const file_suffix = `${vvs.formatDate(dd, 112)}.${vvs.formatDate(dd, 114).replace(/:/g, '')}`
+        const pathPrefix = path.join(vv.dateFormat(dd, 'yyyymmdd'), this._options.key)
+        const fileSuffix = `${this._options.key}.${vv.dateFormat(dd, 'yyyymmdd.hhmissmsec')}`
 
         return {
-            full_file_name_tickets: this.options.process_result.path_save_tickets ? path.join(this.options.process_result.path_save_tickets, path_prefix, 'tickets', `t.${this.options.key}.${file_suffix}.json`) : undefined,
-            items: result.map(m => { return m.map(mm => { return {
+            fullFileNameTickets: this._options.processResult.pastSaveTickets ? path.join(this._options.processResult.pastSaveTickets, pathPrefix, `t.${fileSuffix}.json`) : undefined,
+            serverWorkers: result.map(m => { return m.map(mm => { return {
                 ...mm,
-                full_file_name_rows: this.options.process_result.path_save_rows ? path.join(this.options.process_result.path_save_rows, path_prefix, 'rows', `r.${this.options.key}.${file_suffix}.${mm.idxs}.json`) : undefined,
-                full_file_name_messages: this.options.process_result.path_save_messages ? path.join(this.options.process_result.path_save_messages, path_prefix, 'messages', `m.${this.options.key}.${file_suffix}.${mm.idxs}.json`) : undefined,
-                allow_callback_rows: this.options.process_result.allow_callback_rows,
-                allow_callback_messages: this.options.process_result.allow_callback_messages
-            } }) })
+                fullFileNameRows: this._options.processResult.pathSaveRows ? path.join(this._options.processResult.pathSaveRows, pathPrefix, 'row', `r.${fileSuffix}.${mm.idxs}.json`) : undefined,
+                fullFileNameMessages: this._options.processResult.pathSaveMessages ? path.join(this._options.processResult.pathSaveMessages, pathPrefix, 'msg', `m.${fileSuffix}.${mm.idxs}.json`) : undefined,
+                allowCallbackRows: this._options.processResult.allowCallbackRows,
+                allowCallbackMessages: this._options.processResult.allowCallbackMessages
+            }})})
         }
     }
 

@@ -1,5 +1,9 @@
 node_modules
-sandbox-state
 dist
+<<<<<<< HEAD
+test/*.json
+test/log
+=======
 test/log
 test/*.json
+>>>>>>> 30a5990b9889aea857766b77f4716670565b5c42

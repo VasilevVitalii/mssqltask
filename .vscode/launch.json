@@ -10,13 +10,8 @@
             "name": "test",
             "runtimeArgs": ["--nolazy", "-r", "ts-node/register"],
             "sourceMaps": true,
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "resolveSourceMapLocations": [
-                "${workspaceFolder}/**",
-                "!**/node_modules/**"
-            ],
+            "skipFiles": ["<node_internals>/**"],
+            "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"],
             "program": "${workspaceFolder}/test/index.ts",
             "protocol": "inspector",
             "preLaunchTask": "npm: build"

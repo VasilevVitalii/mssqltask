@@ -1,101 +1,92 @@
 import * as mssql from 'vv-mssql'
-import * as vvs from 'vv-shared'
+import * as vv from 'vv-common'
 
-export type TypeServer = {
+export type TServer = {
     instance: string,
     login: string,
     password: string
 }
 
-export type TypeMessage = {
+export type TMessage = {
     text: string,
     type: 'info' | 'error'
 }
 
-export type TypeRow = {
-    table_index: number
+export type TRow = {
+    tableIndex: number
     row: any
 }
 
-export type TypeExecResultRows = {kind: 'rows', data: TypeRow[]}
-export type TypeExecResultMessages = {kind: 'messages', data: TypeMessage[]}
-
-export type TypeExecResult =
-    {kind: 'start', spid: number} |
-    TypeExecResultRows |
-    TypeExecResultMessages |
-    {kind: 'stop', duration: number, error: Error}
+export type TExecResultStart = {kind: 'start', spid: number}
+export type TExecResultRows = {kind: 'rows', data: TRow[]}
+export type TExecResultMessages = {kind: 'messages', data: TMessage[]}
+export type TExecResultStop = {kind: 'stop', duration: number, error: Error}
+export type TExecResult = TExecResultStart | TExecResultRows | TExecResultMessages | TExecResultStop
 
 export class Server {
-    private server: mssql.app
-    readonly options: TypeServer
-    protected spid: number
+    private _server: mssql.app
+    readonly options: TServer
 
-    constructor(storage: TypeServer, app_name = 'mssqltask') {
+    constructor(storage: TServer, appName = 'mssqltask') {
         this.options = {
             instance: storage.instance || '',
             login: storage.login || '',
             password: storage.password || '',
         }
 
-        this.server = mssql.create({
+        this._server = mssql.create({
             instance: this.options.instance.replace(/\//g, '\\'),
             login: this.options.login,
             password: this.options.password,
             beautify_instance: 'change',
             additional: {
-                app_name: vvs.isEmptyString(app_name) ? 'mssqltask' : app_name
+                app_name: vv.isEmpty(appName) ? 'mssqltask' : appName
             }
         })
-
-        this.spid = 0
     }
 
-    exec(query: string, allow_rows: boolean, allow_messages: boolean, callback: (result: TypeExecResult) => void) {
-        this.server.exec(query, {allow_tables: allow_rows, database: 'master', get_spid: true, stop_on_error: true, chunk: {type: 'msec', chunk: 500}, null_to_undefined: true}, exec_result => {
-            if (exec_result.type === 'spid') {
-                this.spid = exec_result.spid || 0
+    exec(query: string, allowRows: boolean, allowMessages: boolean, callback: (result: TExecResult) => void) {
+        this._server.exec(query, {allow_tables: allowRows, database: 'master', get_spid: true, stop_on_error: true, chunk: {type: 'msec', chunk: 500}, null_to_undefined: true}, execResult => {
+            if (execResult.type === 'spid') {
                 callback({
                     kind: 'start',
-                    spid: this.spid
+                    spid: execResult.spid || 0
                 })
-                return
-            }
-            if (exec_result.type === 'chunk') {
-                if (allow_rows && exec_result.chunk.table.row_list.length > 0) {
+            } else if (execResult.type === 'chunk') {
+                if (allowRows && execResult.chunk.table.row_list.length > 0) {
                     callback({
                         kind: 'rows',
-                        data: exec_result.chunk.table.row_list.map(m => { return {table_index: exec_result.chunk.table.table_index, row: m} })
+                        data: execResult.chunk.table.row_list.map(m => { return {tableIndex: execResult.chunk.table.table_index, row: m} })
                     })
                 }
-                if (allow_messages && exec_result.chunk.message_list.length > 0) {
+                if (allowMessages && execResult.chunk.message_list.length > 0) {
                     callback({
                         kind: 'messages',
-                        data: exec_result.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
+                        data: execResult.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
                     })
                 }
-                return
-            }
-            if (exec_result.type === 'end') {
-                this.spid = 0
-                if (allow_rows && exec_result.end.table_list.some(f => f.row_list.length > 0)) {
+            } else if (execResult.type === 'end') {
+                if (allowRows && execResult.end.table_list.some(f => f.row_list.length > 0)) {
+                    const data = [] as TRow[]
+                    execResult.end.table_list.filter(f => f.row_list.length > 0).forEach(table => {
+                        data.push(...table.row_list.map(m => { return {tableIndex: table.table_index, row: m} }))
+                    })
                     callback({
                         kind: 'rows',
-                        data: [].concat(exec_result.end.table_list.filter(f => f.row_list.length > 0).map(m => { return m.row_list.map(mm => { return {table_index: 0, row: mm} }) }))
+                        data: data
                     })
                 }
-                if (allow_messages && exec_result.end.message_list.length > 0) {
+                if (allowMessages && execResult.end.message_list.length > 0) {
                     callback({
                         kind: 'messages',
-                        data: exec_result.end.message_list.map(m => { return {text: m.message, type: m.type} })
+                        data: execResult.end.message_list.map(m => { return {text: m.message, type: m.type} })
                     })
                 }
                 callback({
                     kind: 'stop',
-                    duration: Math.round(exec_result.end.duration || 0),
-                    error: exec_result.end.error
+                    duration: Math.round(execResult.end.duration || 0),
+                    error: execResult.end.error
                 })
-                return
             }
         })
     }

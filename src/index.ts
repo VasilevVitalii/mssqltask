@@ -2,57 +2,61 @@
 
 import * as path from 'path'
 import worker_threads from 'worker_threads'
-import { TypeWorkerCommand, TypeWorkerResult } from './index.worker'
-import { TypeTask, TypeTaskState } from './task'
+import { TWorkerCommand, TWorkerResult } from './index.worker'
+import { TTask, TTaskState } from './task'
 
 export interface IApp {
     start(): void,
     stop(): void,
     onError(callback:(error: string) => void): void,
-    onChanged(callback:(state: TypeTaskState) => void): void
+    onChanged(callback:(state: TTaskState) => void): void
+    maxWorkersSet(value: number): void
 }
 
-export function createTask(options: TypeTask): IApp {
+export function Create(options: TTask): IApp {
     const worker = new worker_threads.Worker(path.join(__dirname, 'index.worker.js'), {
         workerData: options
     })
-    worker.on('message', (result: TypeWorkerResult) => {
+    worker.on('message', (result: TWorkerResult) => {
         switch (result.kind) {
             case 'state':
-                if (callback_onChanged) {
-                    callback_onChanged(result.state)
+                if (callbackOnChanged) {
+                    callbackOnChanged(result.state)
                 }
                 break
             case 'error': {
-                if (callback_onError) {
-                    callback_onError(result.error)
+                if (callbackOnError) {
+                    callbackOnError(result.error)
                 }
                 break
             }
             default: {
-                if (callback_onError) {
-                    callback_onError(`unknown TypeWorkerResult ${result}`)
+                if (callbackOnError) {
+                    callbackOnError(`unknown TypeWorkerResult ${result}`)
                 }
             }
         }
     })
 
-    let callback_onError = undefined as (error: string) => void
-    let callback_onChanged = undefined as (state: TypeTaskState) => void
+    let callbackOnError = undefined as (error: string) => void
+    let callbackOnChanged = undefined as (state: TTaskState) => void
 
     return {
         start: () => {
-            worker.postMessage({kind: 'start'} as TypeWorkerCommand)
+            worker.postMessage({kind: 'start'} as TWorkerCommand)
         },
         stop: () => {
-            worker.postMessage({kind: 'stop'} as TypeWorkerCommand)
+            worker.postMessage({kind: 'stop'} as TWorkerCommand)
         },
         onError: (callback) => {
-            callback_onError = callback
+            callbackOnError = callback
         },
         onChanged: (callback) => {
-            callback_onChanged = callback
-        }
+            callbackOnChanged = callback
+        },
+        maxWorkersSet(value: number) {
+            worker.postMessage({kind: 'maxWorkers', maxWorkers: value} as TWorkerCommand)
+        },
     }
 }
 

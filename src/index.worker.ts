@@ -1,23 +1,23 @@
 import { workerData, parentPort } from 'worker_threads'
-import { Task, TypeTask, TypeTaskState } from './task'
+import { Task, TTask, TTaskState } from './task'
 
 const env = {
-    options: workerData as TypeTask
+    options: workerData as TTask
 }
 
-export type TypeWorkerCommand =
+export type TWorkerCommand =
     { kind: 'start'} |
     { kind: 'stop' } |
     { kind: 'maxWorkers', maxWorkers: number}
 
 
-export type TypeWorkerResult =
-    { kind: 'state', state: TypeTaskState } |
+export type TWorkerResult =
+    { kind: 'state', state: TTaskState } |
     { kind: 'error', error: string }
 
 const task = new Task(env.options)
 
-parentPort.on('message', (command: TypeWorkerCommand) => {
+parentPort.on('message', (command: TWorkerCommand) => {
     switch (command.kind) {
         case 'start':
             task.start()
@@ -32,7 +32,7 @@ parentPort.on('message', (command: TypeWorkerCommand) => {
             parentPort.postMessage({
                 kind: 'error',
                 error: `unknown TypeWorkerCommand ${command}`
-            } as TypeWorkerResult)
+            } as TWorkerResult)
     }
 })
 
@@ -40,13 +40,13 @@ task.onChanged(state => {
     parentPort.postMessage({
         kind: 'state',
         state: state
-    } as TypeWorkerResult)
+    } as TWorkerResult)
 })
 
 task.onError(error => {
     parentPort.postMessage({
         kind: 'error',
         error: error?.message
-    } as TypeWorkerResult)
+    } as TWorkerResult)
 })
 

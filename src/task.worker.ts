@@ -27,7 +27,7 @@ export type TWorkerResult =
 const env = {
     options: workerData as TWorkerOptions,
     errors: [] as string[],
-    server_results: [] as {server: TServerWorker, result: TExecResult}[]
+    serverResults: [] as {server: TServerWorker, result: TExecResult}[]
 }
 
 const stream = filestream.Create({prefix: '[\n', suffix: '\n]'})
@@ -43,12 +43,12 @@ env.options.servers.forEach(server => {
     const allowRows = server.allowCallbackRows || (server.fullFileNameRows ? true : false)
     const s = new Server(server, 'mssqltask')
     s.exec(env.options.query, allowRows, allowMessages, result => {
-        env.server_results.push({server: server, result: result})
+        env.serverResults.push({server: server, result: result})
     })
 })
 
 let timerServerResult = setTimeout(function tick() {
-    const serverResult = env.server_results.shift()
+    const serverResult = env.serverResults.shift()
     if (!serverResult) {
         timerServerResult = setTimeout(tick, 100)
         return

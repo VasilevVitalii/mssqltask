@@ -1,5 +1,5 @@
-import * as mssql from 'vv-mssql'
 import * as vv from 'vv-common'
+import * as mssqldriver from 'mssqldriver'
 
 export type TServer = {
     instance: string,
@@ -24,7 +24,7 @@ export type TExecResultStop = {kind: 'stop', duration: number, error: Error}
 export type TExecResult = TExecResultStart | TExecResultRows | TExecResultMessages | TExecResultStop
 
 export class Server {
-    private _server: mssql.app
+    private _server: mssqldriver.IApp
     readonly options: TServer
 
     constructor(storage: TServer, appName = 'mssqltask') {
@@ -34,58 +34,42 @@ export class Server {
             password: storage.password || '',
         }
 
-        this._server = mssql.create({
+        this._server = mssqldriver.Create({
+            authentication: 'sqlserver',
             instance: this.options.instance.replace(/\//g, '\\'),
             login: this.options.login,
             password: this.options.password,
-            beautify_instance: 'change',
             additional: {
-                app_name: vv.isEmpty(appName) ? 'mssqltask' : appName
+                appName: vv.isEmpty(appName) ? 'mssqltask' : appName
             }
         })
     }
 
     exec(query: string, allowRows: boolean, allowMessages: boolean, callback: (result: TExecResult) => void) {
-        this._server.exec(query, {allow_tables: allowRows, database: 'master', get_spid: true, stop_on_error: true, chunk: {type: 'msec', chunk: 500}, null_to_undefined: true}, execResult => {
-            if (execResult.type === 'spid') {
+        let tableIndex = -1
+        this._server.exec(query, {formatCells: 'string', receiveTables: allowRows ? 500 : 'none', receiveMessage: allowMessages ? 'directly' : 'none', hasSpid: true}, execResult => {
+            if (execResult.kind === 'spid') {
                 callback({
                     kind: 'start',
                     spid: execResult.spid || 0
                 })
-            } else if (execResult.type === 'chunk') {
-                if (allowRows && execResult.chunk.table.row_list.length > 0) {
-                    callback({
-                        kind: 'rows',
-                        data: execResult.chunk.table.row_list.map(m => { return {tableIndex: execResult.chunk.table.table_index, row: m} })
-                    })
-                }
-                if (allowMessages && execResult.chunk.message_list.length > 0) {
-                    callback({
-                        kind: 'messages',
-                        data: execResult.chunk.message_list.map(m => { return {text: m.message, type: m.type} })
-                    })
-                }
-            } else if (execResult.type === 'end') {
-                if (allowRows && execResult.end.table_list.some(f => f.row_list.length > 0)) {
-                    const data = [] as TRow[]
-                    execResult.end.table_list.filter(f => f.row_list.length > 0).forEach(table => {
-                        data.push(...table.row_list.map(m => { return {tableIndex: table.table_index, row: m} }))
-                    })
-                    callback({
-                        kind: 'rows',
-                        data: data
-                    })
-                }
-                if (allowMessages && execResult.end.message_list.length > 0) {
-                    callback({
-                        kind: 'messages',
-                        data: execResult.end.message_list.map(m => { return {text: m.message, type: m.type} })
-                    })
-                }
+            } else if (execResult.kind === 'columns') {
+                tableIndex++
+            } else if (execResult.kind === 'rows') {
+                callback({
+                    kind: 'rows',
+                    data: execResult.rows.map(m => { return {tableIndex: tableIndex, row: m} })
+                })
+            } else if (execResult.kind === 'message') {
+                callback({
+                    kind: 'messages',
+                    data: [{text: execResult.message.message, type: execResult.message.isError ? 'error' : 'info' }]
+                })
+            } else if (execResult.kind === 'finish') {
                 callback({
                     kind: 'stop',
-                    duration: Math.round(execResult.end.duration || 0),
-                    error: execResult.end.error
+                    duration: Math.round(execResult.finish.duration.total || 0) ,
+                    error: execResult.finish.error
                 })
             }
         })

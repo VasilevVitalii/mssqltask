@@ -16,6 +16,7 @@
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/explicit-module-boundary-types": "off",
         "@typescript-eslint/no-empty-function": "off",
+        "@typescript-eslint/no-this-alias": "off",
         "@typescript-eslint/naming-convention": [
             "error",
             {
@@ -24,26 +25,20 @@
                 "leadingUnderscore": "allowDouble"
             },
             {
-                "selector": ["parameter", "function", "typeProperty"],
+                "selector": ["parameter", "function", "typeProperty", "objectLiteralProperty"],
                 "format": ["camelCase"],
                 "leadingUnderscore": "allowDouble"
             },
             {
-                "selector": "variable",
+                "selector": ["variable", "parameter", "typeProperty"],
                 "types": ["boolean"],
                 "format": ["PascalCase"],
-                "prefix": ["is", "allow", "has", "can", "did", "will"]
-            },
-            {
-                "selector": "parameter",
-                "types": ["boolean"],
-                "format": ["PascalCase"],
-                "prefix": ["is", "allow", "has", "can", "did", "will"]
+                "prefix": ["is", "allow", "has", "can", "did", "will", "check", "use"]
             },
             {
                 "selector": "function",
                 "format": ["PascalCase"],
-                "modifiers": ["global"]
+                "modifiers": ["global", "exported"]
             },
             {
                 "selector": "classMethod",

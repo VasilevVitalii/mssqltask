@@ -1,0 +1,11 @@
+/.auto
+/.github
+/.vscode
+/node_modules
+/src
+/test
+.eslintignore
+.eslintrc.json
+.prettierignore
+.prettierrc
+tsconfig.json

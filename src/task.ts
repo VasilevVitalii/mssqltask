@@ -204,7 +204,9 @@ export class Task {
                                     this._sendError(error)
                                 }
                                 fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
-                                    ...ticket,
+                                    dateStart: vv.dateFormat(ticket.dateStart, '126'),
+                                    dateStop: vv.dateFormat(ticket.dateStop, '126'),
+                                    countWorkers: ticket.countWorkers,
                                     servers: ticket.servers.map(m => { return {
                                         idxs: m.idxs,
                                         instance: m.instance,

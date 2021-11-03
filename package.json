@@ -1,8 +1,8 @@
 {
     "name": "mssqltask",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "description": "Task for MS SQL Server",
-    "main": "dist/index.js",
+    "main": "dist/src/index.js",
     "scripts": {
         "test": "node ./dist/test/index.js",
         "update": "npx npm-check-updates -u && npm i && npm audit fix && node ./node_modules/vv-template-nodebackend/index.js",

@@ -4,6 +4,7 @@ import * as path from 'path'
 import worker_threads from 'worker_threads'
 import { TWorkerCommand, TWorkerResult } from './index.worker'
 import { TTask, TTaskState } from './task'
+export { TTask, TTaskState }
 
 export interface IApp {
     start(): void,

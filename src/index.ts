@@ -1,5 +1,3 @@
-//import worker_threads from 'worker_threads'
-
 import * as path from 'path'
 import worker_threads from 'worker_threads'
 import { TWorkerCommand, TWorkerResult } from './index.worker'
@@ -9,7 +7,7 @@ export { TTask, TTaskState, TypeMetronom }
 
 export interface IApp {
     start(): void,
-    stop(): void,
+    finish(): void,
     onError(callback:(error: string) => void): void,
     onChanged(callback:(state: TTaskState) => void): void
     maxWorkersSet(value: number): void
@@ -47,8 +45,8 @@ export function Create(options: TTask): IApp {
         start: () => {
             worker.postMessage({kind: 'start'} as TWorkerCommand)
         },
-        stop: () => {
-            worker.postMessage({kind: 'stop'} as TWorkerCommand)
+        finish: () => {
+            worker.postMessage({kind: 'finish'} as TWorkerCommand)
         },
         onError: (callback) => {
             callbackOnError = callback

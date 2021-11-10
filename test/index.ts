@@ -48,31 +48,50 @@ let task1CountTick = 0
 let task2CountTick = 0
 let task3CountTick = 0
 
+let isTask1Finished = false
+let isTask2Finished = false
+let isTask3Finished = false
+
 task1.onChanged(state => {
+    if (isTask1Finished) {
+        errors.push({taskKey: 'task1', error: 'onChanged after finish'})
+    }
     console.log('task1', state)
     if (state.kind === 'stop') {
         task1CountTick++
         if (task1CountTick >= 2) {
-            task1.stop()
+            task1.finish()
         }
+    } else if (state.kind === 'finish') {
+        isTask1Finished = true
     }
 })
 task1.maxWorkersSet(-42)
 task2.onChanged(state => {
-    task2.stop()
+    if (isTask2Finished) {
+        errors.push({taskKey: 'task2', error: 'onChanged after finish'})
+    }
+    task2.finish()
     console.log('task2', state)
     if (state.kind === 'stop') {
         task2CountTick++
+    } else if (state.kind === 'finish') {
+        isTask2Finished = true
     }
 })
 task2.maxWorkersSet(999)
 task3.onChanged(state => {
+    if (isTask3Finished) {
+        errors.push({taskKey: 'task3', error: 'onChanged after finish'})
+    }
     console.log('task3', state)
     if (state.kind === 'stop') {
         task3CountTick++
         if (task3CountTick >= 2) {
-            task3.stop()
+            task3.finish()
         }
+    } else if (state.kind === 'finish') {
+        isTask3Finished = true
     }
 })
 
@@ -107,6 +126,15 @@ setTimeout(() => {
         process.exit()
     } else if (task3CountTick != 2) {
         console.warn(`TEST FAIL, task3CountTick = ${task3CountTick}`)
+        process.exit()
+    } else if (!isTask1Finished) {
+        console.warn(`TEST FAIL, task1Finished = ${isTask1Finished}`)
+        process.exit()
+    } else if (!isTask2Finished) {
+        console.warn(`TEST FAIL, task2Finished = ${isTask2Finished}`)
+        process.exit()
+    } else if (!isTask3Finished) {
+        console.warn(`TEST FAIL, task3Finished = ${isTask3Finished}`)
         process.exit()
     }
 

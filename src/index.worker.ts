@@ -7,7 +7,7 @@ const env = {
 
 export type TWorkerCommand =
     { kind: 'start'} |
-    { kind: 'stop' } |
+    { kind: 'finish' } |
     { kind: 'maxWorkers', maxWorkers: number}
 
 
@@ -22,8 +22,12 @@ parentPort.on('message', (command: TWorkerCommand) => {
         case 'start':
             task.start()
             break
-        case 'stop':
-            task.stop()
+        case 'finish':
+            task.finish(() => {
+                parentPort.postMessage({
+                    kind: 'state', state: {kind: 'finish'}
+                } as TWorkerResult)
+            })
             break
         case 'maxWorkers':
             task.maxWorkers = command.maxWorkers

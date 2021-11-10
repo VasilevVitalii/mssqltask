@@ -46,20 +46,20 @@ export type TTicketResult = {
 export type TTaskState =
     {kind: 'start', usedWorkers: number, ticket: TTicketResult} |
     {kind: 'process', ticket: TTicketResult} |
-    {kind: 'stop.worker'} |
-    {kind: 'stop', ticket: TTicketResult}
+    {kind: 'stop', ticket: TTicketResult} |
+    {kind: 'finish'}
 
 export class Task {
     private _options: TTask
     private _metronom: metronom.Metronom
     private _servers: TServerTask[]
     private _state: {
-        command: 'needStart' | 'needStop' | undefined
-        status: ('idle' | 'buzy' | 'stopped')
+        command: 'needStart' | 'needFinish' | undefined
+        status: ('idle' | 'buzy' | 'finish')
     }
 
     private _callbackOnStateChanged: (state: TTaskState) => void
-    private _callbackOnStop: () => void
+    private _callbackOnFinish: () => void
     private _callbackOnError: (error: Error) => void
     maxWorkers: number
 
@@ -70,7 +70,7 @@ export class Task {
 
         this._state = {
             command: undefined,
-            status: 'stopped'
+            status: 'idle'
         }
         this._metronom.onTick(() => {
             this._onTick()
@@ -83,9 +83,10 @@ export class Task {
         this._state.command = 'needStart'
     }
 
-    stop(callback?: () => void) {
-        this._state.command = 'needStop'
-        this._callbackOnStop = callback
+    finish(callback?: () => void) {
+        if (this._state.command === 'needFinish' || this._state.status === 'finish') return
+        this._state.command = 'needFinish'
+        this._callbackOnFinish = callback
     }
 
     private _onTick() {
@@ -97,12 +98,12 @@ export class Task {
         if (this._state.command === 'needStart') {
             this._state.status = 'idle'
             this._state.command = undefined
-        } else if (this._state.command === 'needStop') {
-            this._state.status = 'stopped'
+        } else if (this._state.command === 'needFinish') {
+            this._state.status = 'finish'
             this._state.command = undefined
-            if (this._callbackOnStop) {
-                this._callbackOnStop()
-                this._callbackOnStop = undefined
+            if (this._callbackOnFinish) {
+                this._callbackOnFinish()
+                this._callbackOnFinish = undefined
             }
         }
 
@@ -190,7 +191,6 @@ export class Task {
                 }
 
                 if (result.kind === 'end') {
-                    this._sendChanged({kind: 'stop.worker'})
                     result.errors.forEach(errorMessage => {
                         this._sendError(new Error (errorMessage))
                     })
@@ -288,6 +288,4 @@ export class Task {
             }})})
         }
     }
-
-
 }

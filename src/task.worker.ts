@@ -4,7 +4,6 @@ import { Server, TExecResult, TMessage, TServer } from "./server"
 
 export type TServerWorker = TServer & {
     idxs: string,
-    //fullFileNameTickets: string,
     fullFileNameRows: string,
     fullFileNameMessages: string,
     allowCallbackRows: boolean,

@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs-extra'
-import worker_threads from 'worker_threads'
+import worker_threads, { markAsUntransferable, threadId } from 'worker_threads'
 import * as metronom from 'vv-metronom'
 import * as vv from 'vv-common'
 import { TServer, TMessage } from './server'
@@ -54,8 +54,9 @@ export class Task {
     private _metronom: metronom.Metronom
     private _servers: TServerTask[]
     private _state: {
-        command: 'needStart' | 'needFinish' | undefined
-        status: ('idle' | 'buzy' | 'finish')
+        isStarted: boolean,
+        needFinish: boolean,
+        status: 'idle' | 'buzy' | 'finish'
     }
 
     private _callbackOnStateChanged: (state: TTaskState) => void
@@ -69,48 +70,51 @@ export class Task {
         this._servers = this._options.servers.map((m,i) => { return {...m, idxs: `${i > 99 ? '' : i > 9 ? '0' : '00'}${i}`} })
 
         this._state = {
-            command: undefined,
+            isStarted: false,
+            needFinish: false,
             status: 'idle'
         }
         this._metronom.onTick(() => {
             this._onTick()
         })
         this.maxWorkers = this._servers.length
-        this._metronom.start()
     }
 
     start() {
-        this._state.command = 'needStart'
+        if (this._state.isStarted) return
+        this._state.isStarted = true
+        this._metronom.start()
     }
 
     finish(callback?: () => void) {
-        if (this._state.command === 'needFinish' || this._state.status === 'finish') return
-        this._state.command = 'needFinish'
+        if (this._state.needFinish || this._state.status === 'finish') return
+        this._state.needFinish = true
         this._callbackOnFinish = callback
+        this.finishProcess()
+    }
+
+    finishProcess(): boolean {
+        if (this._state.needFinish && this._state.status === 'idle') {
+            this._state.status = 'finish'
+            if (this._callbackOnFinish) {
+                this._callbackOnFinish()
+                this._callbackOnFinish = undefined
+            }
+            this._metronom.stop()
+            return true
+        }
+        return false
     }
 
     private _onTick() {
+        if (this.finishProcess() || this._state.status === 'finish') {
+            return
+        }
         if (this._state.status === 'buzy') {
             this._metronom.allowNextTick()
             return
         }
 
-        if (this._state.command === 'needStart') {
-            this._state.status = 'idle'
-            this._state.command = undefined
-        } else if (this._state.command === 'needFinish') {
-            this._state.status = 'finish'
-            this._state.command = undefined
-            if (this._callbackOnFinish) {
-                this._callbackOnFinish()
-                this._callbackOnFinish = undefined
-            }
-        }
-
-        if (this._state.status !== 'idle') {
-            this._metronom.allowNextTick()
-            return
-        }
         this._state.status = 'buzy'
 
         const chunks = this._serversToWorkerChunks()

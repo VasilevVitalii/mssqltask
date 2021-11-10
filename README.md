@@ -35,10 +35,7 @@ task.onError(error => {
     console.log(error)
 })
 task.onChanged(state => {
-    console.log('task1', state)
-    if (state.kind === 'stop') {
-        //task worked on all servers
-    }
+    console.log(state)
 })
 task.start()
 ```

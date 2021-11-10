@@ -45,9 +45,9 @@ export class Server {
         })
     }
 
-    exec(query: string, allowRows: boolean, allowMessages: boolean, callback: (result: TExecResult) => void) {
+    exec(queries: string[], allowRows: boolean, allowMessages: boolean, callback: (result: TExecResult) => void) {
         let tableIndex = -1
-        this._server.exec(query, {formatCells: 'string', receiveTables: allowRows ? 500 : 'none', receiveMessage: allowMessages ? 'directly' : 'none', hasSpid: true}, execResult => {
+        this._server.exec(queries, {formatCells: 'string', receiveTables: allowRows ? 500 : 'none', receiveMessage: allowMessages ? 'directly' : 'none', hasSpid: true}, execResult => {
             if (execResult.kind === 'spid') {
                 callback({
                     kind: 'start',

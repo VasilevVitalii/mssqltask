@@ -10,7 +10,7 @@ export type TTask = {
     key: string
     metronom: metronom.TypeMetronom
     servers: TServer[]
-    query: string
+    queries: string[]
     processResult: {
         allowCallbackRows?: boolean,
         allowCallbackMessages?: boolean,
@@ -144,7 +144,7 @@ export class Task {
             const worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
                 workerData: {
                     servers: servers,
-                    query: this._options.query
+                    queries: this._options.queries
                 } as TWorkerOptions
             })
             worker.on('message', (result: TWorkerResult) => {

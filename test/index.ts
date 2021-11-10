@@ -8,7 +8,7 @@ const task1 = lib.Create({
     key: 'task1',
     metronom: data.Metronoms()[0],
     servers: data.Servers(),
-    query: "print 'hello1'; select * from sys.objects; select * from sys.objects; print 'bye1'",
+    queries: ["print 'hello1'; select * from sys.objects; select * from sys.objects; print 'bye1'"],
     processResult: {
         allowCallbackMessages: false,
         allowCallbackRows: false,
@@ -22,7 +22,7 @@ const task2 = lib.Create({
     key: 'task2',
     metronom: data.Metronoms()[1],
     servers: data.Servers(),
-    query: "print 'hello2'; select top 10 * from sys.objects; select top 5 * from sys.objects; print 'bye2'",
+    queries: ["print 'hello2'; select top 10 * from sys.objects; select top 5 * from sys.objects; print 'bye2'; declare @p int", "decpare @p bit"],
     processResult: {
         allowCallbackMessages: true,
         allowCallbackRows: true,
@@ -36,7 +36,7 @@ const task3 = lib.Create({
     key: 'task3',
     metronom: data.Metronoms()[0],
     servers: data.Servers(),
-    query: "print 'hello2'; select top 1 * from sys.objects; select top 1 * from sys.objects; print 'bye2'",
+    queries: ["print 'hello2'; select top 1 * from sys.objects; select top 1 * from sys.objects; print 'bye2'"],
     processResult: {
         allowCallbackMessages: true,
         allowCallbackRows: true,

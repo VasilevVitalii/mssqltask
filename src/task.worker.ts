@@ -14,7 +14,7 @@ export type TServerWorker = TServer & {
 
 export type TWorkerOptions = {
     servers: TServerWorker[],
-    query: string
+    queries: string[]
 }
 
 export type TWorkerResult =
@@ -42,7 +42,7 @@ env.options.servers.forEach(server => {
     const allowMessages = server.allowCallbackMessages || (server.fullFileNameMessages ? true : false)
     const allowRows = server.allowCallbackRows || (server.fullFileNameRows ? true : false)
     const s = new Server(server, 'mssqltask')
-    s.exec(env.options.query, allowRows, allowMessages, result => {
+    s.exec(env.options.queries, allowRows, allowMessages, result => {
         env.serverResults.push({server: server, result: result})
     })
 })

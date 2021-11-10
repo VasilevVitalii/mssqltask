@@ -23,7 +23,7 @@ const task = mssqltask.Create({
             "password": "123456789"
         },
     ],
-    query: "print 'hello'; select * from sys.objects; select * from sys.objects; print 'bye'",
+    queries: ["print 'hello'; select * from sys.objects; select * from sys.objects; print 'bye'"],
     processResult: {
         pathSaveTickets: 'c:/log',
         pathSaveRows: 'c:/log',

@@ -26,7 +26,9 @@ export type TWorkerResult =
 const env = {
     options: workerData as TWorkerOptions,
     errors: [] as string[],
-    serverResults: [] as {server: TServerWorker, result: TExecResult}[]
+    serverResults: [] as {server: TServerWorker, result: TExecResult}[],
+    serverHasRows: [] as TServerWorker[],
+    serverHasMessages: [] as TServerWorker[],
 }
 
 const stream = filestream.Create({prefix: '[\n', suffix: '\n]'})
@@ -64,6 +66,7 @@ let timerServerResult = setTimeout(function tick() {
         return
     }
     if (result.kind === 'rows') {
+        if (!env.serverHasRows.some(f => f === server)) env.serverHasRows.push(server)
         if (server.fullFileNameRows) {
             stream.write({fullFileName: server.fullFileNameRows, data: result.data.map(m=> { return {kind: 'row',...m}  })})
         }
@@ -77,6 +80,7 @@ let timerServerResult = setTimeout(function tick() {
         return
     }
     if (result.kind === 'messages') {
+        if (!env.serverHasMessages.some(f => f === server)) env.serverHasMessages.push(server)
         if (server.fullFileNameMessages) {
             stream.write({fullFileName: server.fullFileNameMessages, data: result.data.map(m => { return {kind: 'msg', ...m} })})
         }
@@ -92,10 +96,10 @@ let timerServerResult = setTimeout(function tick() {
     if (result.kind === 'stop') {
         if (server.fullFileNameRows || server.fullFileNameMessages) {
             const lastRow = {kind: 'end', serverIdxs: server.idxs, serverInstance: server.instance, execDurationMsec: result.duration}
-            if (server.fullFileNameRows) {
+            if (server.fullFileNameRows && env.serverHasRows.some(f => f === server)) {
                 stream.write({fullFileName: server.fullFileNameRows, data: JSON.stringify(lastRow)})
             }
-            if (server.fullFileNameMessages) {
+            if (server.fullFileNameMessages && env.serverHasMessages.some(f => f === server)) {
                 stream.write({fullFileName: server.fullFileNameMessages, data: JSON.stringify(lastRow)})
             }
         }

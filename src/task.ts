@@ -210,7 +210,7 @@ export class Task {
                                 fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
                                     ...ticket,
                                     servers: ticket.servers.map(m => { return {
-                                        ...m, rows: undefined, messages: undefined
+                                        ...m, rows: undefined, messages: undefined, state: undefined
                                     }})
                                 }, null, 4), 'utf8', error => {
                                     if (error) {

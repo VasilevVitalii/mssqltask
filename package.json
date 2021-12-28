@@ -1,6 +1,6 @@
 {
     "name": "mssqltask",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Task for MS SQL Server",
     "main": "dist/src/index.js",
     "scripts": {

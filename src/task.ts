@@ -25,8 +25,8 @@ export type TServerTask = TServer & {
 }
 
 export type TTicketResult = {
-    dateStart: Date,
-    dateStop: Date,
+    dateStart: string,
+    dateStop: string,
     countWorkers: number
     servers: {
         idxs: string,
@@ -119,7 +119,7 @@ export class Task {
 
         const chunks = this._serversToWorkerChunks()
         const ticket = {
-            dateStart: new Date(),
+            dateStart: vv.dateFormat(new Date(),'126'),
             dateStop: undefined,
             countWorkers: chunks.serverWorkers.length,
             servers: []
@@ -200,7 +200,7 @@ export class Task {
                     })
                     completeIdx.push(serversIdx)
                     if (completeIdx.length === ticket.countWorkers) {
-                        ticket.dateStop = new Date()
+                        ticket.dateStop = vv.dateFormat(new Date(), '126'),
                         this._sendChanged({kind: 'stop', ticket: ticket})
                         if (chunks.fullFileNameTickets) {
                             fs.ensureDir(path.parse(chunks.fullFileNameTickets).dir, error => {
@@ -208,18 +208,9 @@ export class Task {
                                     this._sendError(error)
                                 }
                                 fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
-                                    dateStart: vv.dateFormat(ticket.dateStart, '126'),
-                                    dateStop: vv.dateFormat(ticket.dateStop, '126'),
-                                    countWorkers: ticket.countWorkers,
+                                    ...ticket,
                                     servers: ticket.servers.map(m => { return {
-                                        idxs: m.idxs,
-                                        instance: m.instance,
-                                        workerId: m.workerId,
-                                        execSpId: m.execSpId,
-                                        execDurationMsec: m.execDurationMsec,
-                                        execError: m.execError,
-                                        countRows: m.countRows,
-                                        countMessages: m.countMessages
+                                        ...m, rows: undefined, messages: undefined
                                     }})
                                 }, null, 4), 'utf8', error => {
                                     if (error) {

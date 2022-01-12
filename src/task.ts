@@ -1,6 +1,6 @@
 import path from 'path'
 import fs from 'fs-extra'
-import worker_threads, { markAsUntransferable, threadId } from 'worker_threads'
+import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
 import * as vv from 'vv-common'
 import { TServer, TMessage } from './server'
@@ -146,7 +146,7 @@ export class Task {
 
         this._sendChanged({kind: 'start', usedWorkers: ticket.countWorkers, ticket: ticket})
         chunks.serverWorkers.forEach((servers, serversIdx) => {
-            const worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
+            let worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
                 workerData: {
                     servers: servers,
                     queries: this._options.queries
@@ -222,6 +222,9 @@ export class Task {
                         this._state.status = 'idle'
                         this._metronom.allowNextTick()
                     }
+                    worker.removeAllListeners()
+                    worker.terminate()
+                    worker = undefined
                     return
                 }
             })

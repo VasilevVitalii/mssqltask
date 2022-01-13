@@ -12,8 +12,6 @@ export type TTask = {
     servers: TServer[]
     queries: string[]
     processResult: {
-        allowCallbackRows?: boolean,
-        allowCallbackMessages?: boolean,
         pathSaveTickets?: string,
         pathSaveRows?: string,
         pathSaveMessages?: string
@@ -280,9 +278,7 @@ export class Task {
             serverWorkers: result.map(m => { return m.map(mm => { return {
                 ...mm,
                 fullFileNameRows: this._options.processResult.pathSaveRows ? path.join(this._options.processResult.pathSaveRows, pathPrefix, 'row', `r.${fileSuffix}.${mm.idxs}.json`) : undefined,
-                fullFileNameMessages: this._options.processResult.pathSaveMessages ? path.join(this._options.processResult.pathSaveMessages, pathPrefix, 'msg', `m.${fileSuffix}.${mm.idxs}.json`) : undefined,
-                allowCallbackRows: this._options.processResult.allowCallbackRows,
-                allowCallbackMessages: this._options.processResult.allowCallbackMessages
+                fullFileNameMessages: this._options.processResult.pathSaveMessages ? path.join(this._options.processResult.pathSaveMessages, pathPrefix, 'msg', `m.${fileSuffix}.${mm.idxs}.json`) : undefined
             }})})
         }
     }

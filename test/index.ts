@@ -10,11 +10,7 @@ const task1 = lib.Create({
     servers: data.Servers(),
     queries: ["print 'hello1'; select * from sys.objects; select * from sys.objects; print 'bye1'"],
     processResult: {
-        allowCallbackMessages: false,
-        allowCallbackRows: false,
         pathSaveTickets: logPath,
-        pathSaveRows: logPath,
-        pathSaveMessages: logPath
     }
 })
 
@@ -24,8 +20,6 @@ const task2 = lib.Create({
     servers: data.Servers(),
     queries: ["print 'hello2'; select top 10 * from sys.objects; select top 5 * from sys.objects; print 'bye2'; declare @p int", "decpare @p bit"],
     processResult: {
-        allowCallbackMessages: true,
-        allowCallbackRows: true,
         pathSaveTickets: logPath,
         pathSaveRows: logPath,
         pathSaveMessages: logPath
@@ -37,11 +31,7 @@ const task3 = lib.Create({
     metronom: data.Metronoms()[0],
     servers: data.Servers(),
     queries: ["print 'hello2'; select top 1 * from sys.objects; select top 1 * from sys.objects; print 'bye2'"],
-    processResult: {
-        allowCallbackMessages: true,
-        allowCallbackRows: true,
-        pathSaveTickets: logPath,
-    }
+    processResult: {}
 })
 
 let task1CountTick = 0
@@ -56,13 +46,15 @@ task1.onChanged(state => {
     if (isTask1Finished) {
         errors.push({taskKey: 'task1', error: 'onChanged after finish'})
     }
-    console.log('task1', state)
+    //console.log('task1', state)
     if (state.kind === 'stop') {
+        console.log('task1', state)
         task1CountTick++
         if (task1CountTick >= 2) {
             task1.finish()
         }
     } else if (state.kind === 'finish') {
+        console.log('task1', state)
         isTask1Finished = true
     }
 })
@@ -72,10 +64,12 @@ task2.onChanged(state => {
         errors.push({taskKey: 'task2', error: 'onChanged after finish'})
     }
     task2.finish()
-    console.log('task2', state)
+    //console.log('task2', state)
     if (state.kind === 'stop') {
+        console.log('task2', state)
         task2CountTick++
     } else if (state.kind === 'finish') {
+        console.log('task2', state)
         isTask2Finished = true
     }
 })
@@ -84,13 +78,15 @@ task3.onChanged(state => {
     if (isTask3Finished) {
         errors.push({taskKey: 'task3', error: 'onChanged after finish'})
     }
-    console.log('task3', state)
+    //console.log('task3', state)
     if (state.kind === 'stop') {
+        console.log('task3', state)
         task3CountTick++
         if (task3CountTick >= 2) {
             task3.finish()
         }
     } else if (state.kind === 'finish') {
+        console.log('task3', state)
         isTask3Finished = true
     }
 })
@@ -118,24 +114,25 @@ setTimeout(() => {
     if (errors.length > 0) {
         console.warn('TEST FAIL, TASK WORK WITH ERROR')
         process.exit()
-    } else if (task1CountTick != 2) {
-        console.warn(`TEST FAIL, task1CountTick = ${task1CountTick}`)
-        process.exit()
-    } else if (task2CountTick != 1) {
-        console.warn(`TEST FAIL, task2CountTick = ${task2CountTick}`)
-        process.exit()
-    } else if (task3CountTick != 2) {
-        console.warn(`TEST FAIL, task3CountTick = ${task3CountTick}`)
-        process.exit()
-    } else if (!isTask1Finished) {
+    }
+
+    if (task1CountTick != 2) {
+        console.warn(`TEST FAIL, task1CountTick = ${task1CountTick} (need 2)`)
+    }
+    if (task2CountTick != 1) {
+        console.warn(`TEST FAIL, task2CountTick = ${task2CountTick} (need 1)`)
+    }
+    if (task3CountTick != 2) {
+        console.warn(`TEST FAIL, task3CountTick = ${task3CountTick} (need 2)`)
+    }
+    if (!isTask1Finished) {
         console.warn(`TEST FAIL, task1Finished = ${isTask1Finished}`)
-        process.exit()
-    } else if (!isTask2Finished) {
+    }
+    if (!isTask2Finished) {
         console.warn(`TEST FAIL, task2Finished = ${isTask2Finished}`)
-        process.exit()
-    } else if (!isTask3Finished) {
+    }
+    if (!isTask3Finished) {
         console.warn(`TEST FAIL, task3Finished = ${isTask3Finished}`)
-        process.exit()
     }
 
     vv.dir(logPath, {mode: 'all'}, (error, result) => {
@@ -144,7 +141,7 @@ setTimeout(() => {
             return
         }
         const countFiles = result.filter(f => !vv.isEmpty(f.file)).length
-        if (countFiles !== 17) {
+        if (countFiles !== 7) {
             console.warn(`TEST FAIL, countFiles = ${countFiles}`)
             process.exit()
         }

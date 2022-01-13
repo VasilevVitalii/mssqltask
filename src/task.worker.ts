@@ -6,8 +6,6 @@ export type TServerWorker = TServer & {
     idxs: string,
     fullFileNameRows: string,
     fullFileNameMessages: string,
-    allowCallbackRows: boolean,
-    allowCallbackMessages: boolean,
     isComplete?: boolean
 }
 
@@ -40,8 +38,8 @@ stream.onClose(result => {
 })
 
 env.options.servers.forEach(server => {
-    const allowMessages = server.allowCallbackMessages || (server.fullFileNameMessages ? true : false)
-    const allowRows = server.allowCallbackRows || (server.fullFileNameRows ? true : false)
+    const allowMessages = server.fullFileNameMessages ? true : false
+    const allowRows = server.fullFileNameRows ? true : false
     const s = new Server(server, 'mssqltask')
     s.exec(env.options.queries, allowRows, allowMessages, result => {
         env.serverResults.push({server: server, result: result})
@@ -74,7 +72,7 @@ let timerServerResult = setTimeout(function tick() {
             kind: 'rows',
             idxs: server.idxs,
             count: result.data.length,
-            data: server.allowCallbackRows ? result.data : []
+            data: server.fullFileNameRows ? result.data : []
         } as TWorkerResult)
         timerServerResult = setTimeout(tick, 50)
         return
@@ -88,7 +86,7 @@ let timerServerResult = setTimeout(function tick() {
             kind: 'messages',
             idxs: server.idxs,
             count: result.data.length,
-            data: server.allowCallbackMessages ? result.data : []
+            data: server.fullFileNameMessages ? result.data : []
         } as TWorkerResult)
         timerServerResult = setTimeout(tick, 50)
         return

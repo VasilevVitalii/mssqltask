@@ -3,7 +3,7 @@ import fs from 'fs-extra'
 import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
 import * as vv from 'vv-common'
-import { TServer, TMessage } from './server'
+import { TServer } from './server'
 import { TWorkerResult, TWorkerOptions, TServerWorker } from './task.worker'
 
 export type TTask = {
@@ -34,8 +34,6 @@ export type TTicketResult = {
         execSpId: number,
         execDurationMsec: number,
         execError: string,
-        rows: any[],
-        messages: TMessage[],
         countRows: number,
         countMessages: number,
     }[]
@@ -115,8 +113,8 @@ export class Task {
 
         this._state.status = 'buzy'
 
-        const chunks = this._serversToWorkerChunks()
-        const ticket = {
+        let chunks = this._serversToWorkerChunks()
+        let ticket = {
             dateStart: vv.dateFormat(new Date(),'126'),
             dateStop: undefined,
             countWorkers: chunks.serverWorkers.length,
@@ -132,8 +130,6 @@ export class Task {
                     execSpId: 0,
                     execDurationMsec: 0,
                     execError: '',
-                    rows: [],
-                    messages: [],
                     countRows: 0,
                     countMessages: 0
                 })
@@ -165,7 +161,6 @@ export class Task {
                     const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
                     if (ticketServer) {
                         ticketServer.countRows = ticketServer.countRows + result.count
-                        ticketServer.rows.push(...result.data)
                     }
                     this._sendChanged({kind: 'process', ticket: ticket})
                     return
@@ -175,7 +170,6 @@ export class Task {
                     const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
                     if (ticketServer) {
                         ticketServer.countMessages = ticketServer.countMessages + result.count
-                        ticketServer.messages.push(...result.data)
                     }
                     this._sendChanged({kind: 'process', ticket: ticket})
                     return
@@ -208,12 +202,14 @@ export class Task {
                                 fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
                                     ...ticket,
                                     servers: ticket.servers.map(m => { return {
-                                        ...m, rows: undefined, messages: undefined, state: undefined
+                                        ...m, state: undefined
                                     }})
                                 }, null, 4), 'utf8', error => {
                                     if (error) {
                                         this._sendError(error)
                                     }
+                                    ticket = null
+                                    chunks = null
                                 })
                             })
                         }
@@ -222,7 +218,7 @@ export class Task {
                     }
                     worker.removeAllListeners()
                     worker.terminate()
-                    worker = undefined
+                    worker = null
                     return
                 }
             })

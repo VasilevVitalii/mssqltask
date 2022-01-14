@@ -30,12 +30,12 @@ const env = {
 }
 
 const stream = filestream.Create({prefix: '[\n', suffix: '\n]'})
-stream.onClose(result => {
-    parentPort.postMessage({
-        kind: 'end',
-        errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
-    } as TWorkerResult)
-})
+// stream.onClose(result => {
+//     parentPort.postMessage({
+//         kind: 'end',
+//         errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
+//     } as TWorkerResult)
+// })
 
 env.options.servers.forEach(server => {
     const allowMessages = server.fullFileNameMessages ? true : false
@@ -112,7 +112,13 @@ let timerServerResult = setTimeout(function tick() {
         } as TWorkerResult)
 
         if (env.options.servers.every(f => f.isComplete === true)) {
-            stream.close()
+            stream.close(result => {
+                parentPort.postMessage({
+                    kind: 'end',
+                    errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
+                } as TWorkerResult)
+            })
+            //stream.close()
         } else {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             timerServerResult = setTimeout(tick, 50)

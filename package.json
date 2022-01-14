@@ -35,7 +35,7 @@
         "fs-extra": "^10.0.0",
         "mssqldriver": "0.0.10",
         "vv-common": "0.1.0",
-        "vv-filestream": "0.1.3",
+        "vv-filestream": "0.2.0",
         "vv-metronom": "0.0.5"
     }
 }

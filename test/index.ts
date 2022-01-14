@@ -1,3 +1,6 @@
+//import * as leak from './findMemoryLeak'
+//leak.Go()
+
 import * as lib from '../src'
 import * as data from './data'
 import * as vv from 'vv-common'
@@ -102,6 +105,7 @@ task2.onError(error => {
 task3.onError(error => {
     errors.push({taskKey: 'task3', error: error})
 })
+console.log('START!')
 task1.start()
 task2.start()
 task3.start()

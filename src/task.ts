@@ -22,21 +22,23 @@ export type TServerTask = TServer & {
     idxs: string
 }
 
+export type TTicketResultServer = {
+    idxs: string,
+    instance: string,
+    state: 'idle' | 'process' | 'stop'
+    workerId: number,
+    execSpId: number,
+    execDurationMsec: number,
+    execError: string,
+    countRows: number,
+    countMessages: number,
+}
+
 export type TTicketResult = {
     dateStart: string,
     dateStop: string,
     countWorkers: number
-    servers: {
-        idxs: string,
-        instance: string,
-        state: 'idle' | 'process' | 'stop'
-        workerId: number,
-        execSpId: number,
-        execDurationMsec: number,
-        execError: string,
-        countRows: number,
-        countMessages: number,
-    }[]
+    servers: TTicketResultServer[]
 }
 
 export type TTaskState =

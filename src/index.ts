@@ -1,9 +1,9 @@
 import * as path from 'path'
 import worker_threads from 'worker_threads'
 import { TWorkerCommand, TWorkerResult } from './index.worker'
-import { TTask, TTaskState, TTicketResult } from './task'
+import { TTask, TTaskState, TTicketResult, TTicketResultServer } from './task'
 import { TypeMetronom } from 'vv-metronom'
-export { TTask, TTaskState, TypeMetronom, TTicketResult }
+export { TTask, TTaskState, TypeMetronom, TTicketResult, TTicketResultServer }
 
 export interface IApp {
     start(): void,

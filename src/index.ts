@@ -59,34 +59,3 @@ export function Create(options: TTask): IApp {
         },
     }
 }
-
-/*
-
-app (facade) with task list
-    worker by each task
-        worker by each exec
-
-log/yyyyddmm/task1/hhmmssmmm.json
-log/yyyyddmm/task1/hhmmssmmm/rows_0.json
-log/yyyyddmm/task1/hhmmssmmm/messages_0.json
-
-
-VVVVVVVVVVVVVVVV
-log/yyyyddmm/task/tickets/     t.task.yyyyddmm.hhmmssmmm.json
-log/yyyyddmm/task/rows/        r.task.idx.yyyyddmm.hhmmssmmm.json
-log/yyyyddmm/task/messages/    m.task.idx.yyyyddmm.hhmmssmmm.json
-VVVVVVVVVVVVVVVV
-
-log/task/yyyyddmm/tickets/     t.task.yyyyddmm.hhmmssmmm.json
-log/task/yyyyddmm/rows/        r.task.yyyyddmm.hhmmssmmm.json
-log/task/yyyyddmm/messages/    m.task.yyyyddmm.hhmmssmmm.json
-
-
-ticket
-    dateStart
-    dateStop
-    execDurationMsec
-    execError
-    countRows
-    countMessages
-*/

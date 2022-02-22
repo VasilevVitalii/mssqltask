@@ -20,26 +20,26 @@ export function Create(options: TTask): IApp {
     worker.on('message', (result: TWorkerResult) => {
         switch (result.kind) {
             case 'state':
-                if (callbackOnChanged) {
-                    callbackOnChanged(result.state)
-                }
+                callbackOnChanged.forEach(callback => {
+                    callback(result.state)
+                })
                 break
             case 'error': {
-                if (callbackOnError) {
-                    callbackOnError(result.error)
-                }
+                callbackOnError.forEach(callback => {
+                    callback(result.error)
+                })
                 break
             }
             default: {
-                if (callbackOnError) {
-                    callbackOnError(`unknown TypeWorkerResult ${result}`)
-                }
+                callbackOnError.forEach(callback => {
+                    callback(`unknown TypeWorkerResult ${result}`)
+                })
             }
         }
     })
 
-    let callbackOnError = undefined as (error: string) => void
-    let callbackOnChanged = undefined as (state: TTaskState) => void
+    const callbackOnError = [] as ((error: string) => void)[]
+    const callbackOnChanged = [] as ((state: TTaskState) => void)[]
 
     return {
         start: () => {
@@ -49,10 +49,10 @@ export function Create(options: TTask): IApp {
             worker.postMessage({kind: 'finish'} as TWorkerCommand)
         },
         onError: (callback) => {
-            callbackOnError = callback
+            callbackOnError.push(callback)
         },
         onChanged: (callback) => {
-            callbackOnChanged = callback
+            callbackOnChanged.push(callback)
         },
         maxWorkersSet(value: number) {
             worker.postMessage({kind: 'maxWorkers', maxWorkers: value} as TWorkerCommand)

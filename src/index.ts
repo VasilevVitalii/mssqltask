@@ -3,7 +3,8 @@ import worker_threads from 'worker_threads'
 import { TWorkerCommand, TWorkerResult } from './index.worker'
 import { TTask, TTaskState, TTicketResult, TTicketResultServer } from './task'
 import { TypeMetronom } from 'vv-metronom'
-export { TTask, TTaskState, TypeMetronom, TTicketResult, TTicketResultServer }
+import { TMessage } from './server'
+export { TTask, TTaskState, TypeMetronom, TTicketResult, TTicketResultServer, TMessage }
 
 export interface IApp {
     start(): void,

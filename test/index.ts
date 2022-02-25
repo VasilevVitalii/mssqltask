@@ -15,7 +15,7 @@ const task1 = lib.Create({
     processResult: {
         pathSaveTickets: logPath,
     }
-})
+}, true)
 
 const task2 = lib.Create({
     key: 'task2',
@@ -27,7 +27,7 @@ const task2 = lib.Create({
         pathSaveRows: logPath,
         pathSaveMessages: logPath
     }
-})
+}, true)
 
 const task3 = lib.Create({
     key: 'task3',
@@ -35,7 +35,7 @@ const task3 = lib.Create({
     servers: data.Servers(),
     queries: ["print 'hello2'; select top 1 * from sys.objects; select top 1 * from sys.objects; print 'bye2'"],
     processResult: {}
-})
+}, true)
 
 let task1CountTick = 0
 let task2CountTick = 0
@@ -51,7 +51,7 @@ task1.onChanged(state => {
     }
     //console.log('task1', state)
     if (state.kind === 'stop') {
-        console.log('task1', state)
+        console.log('task1', JSON.stringify(state, null, 4))
         task1CountTick++
         if (task1CountTick >= 2) {
             task1.finish()
@@ -69,7 +69,7 @@ task2.onChanged(state => {
     task2.finish()
     //console.log('task2', state)
     if (state.kind === 'stop') {
-        console.log('task2', state)
+        console.log('task2', JSON.stringify(state, null, 4))
         task2CountTick++
     } else if (state.kind === 'finish') {
         console.log('task2', state)
@@ -83,7 +83,7 @@ task3.onChanged(state => {
     }
     //console.log('task3', state)
     if (state.kind === 'stop') {
-        console.log('task3', state)
+        console.log('task3', JSON.stringify(state, null, 4))
         task3CountTick++
         if (task3CountTick >= 2) {
             task3.finish()

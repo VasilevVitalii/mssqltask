@@ -1,9 +1,7 @@
 import { workerData, parentPort } from 'worker_threads'
 import { Task, TTask, TTaskState } from './task'
 
-const env = {
-    options: workerData as TTask
-}
+const options = workerData as {task: TTask, allowMessagesInKindEnd: boolean}
 
 export type TWorkerCommand =
     { kind: 'start'} |
@@ -15,7 +13,7 @@ export type TWorkerResult =
     { kind: 'state', state: TTaskState } |
     { kind: 'error', error: string }
 
-const task = new Task(env.options)
+const task = new Task(options.task, options.allowMessagesInKindEnd)
 
 parentPort.on('message', (command: TWorkerCommand) => {
     switch (command.kind) {

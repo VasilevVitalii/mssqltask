@@ -4,7 +4,7 @@ import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
 import * as vv from 'vv-common'
 import { TServer } from './server'
-import { TWorkerResult, TWorkerOptions, TServerWorker } from './task.worker'
+import { TWorkerResult, TWorkerOptions, TServerWorker, TAllMessage } from './task.worker'
 
 export type TTask = {
     key: string
@@ -44,7 +44,7 @@ export type TTicketResult = {
 export type TTaskState =
     {kind: 'start', usedWorkers: number, ticket: TTicketResult} |
     {kind: 'process', ticket: TTicketResult} |
-    {kind: 'stop', ticket: TTicketResult} |
+    {kind: 'stop', ticket: TTicketResult, messages: TAllMessage[]} |
     {kind: 'finish'}
 
 export class Task {
@@ -60,13 +60,15 @@ export class Task {
     private _callbackOnStateChanged: (state: TTaskState) => void
     private _callbackOnFinish: () => void
     private _callbackOnError: (error: Error) => void
+
+    private _allowMessagesInKindEnd: boolean
+
     maxWorkers: number
 
-    constructor(options: TTask) {
+    constructor(options: TTask, allowMessagesInKindEnd: boolean) {
         this._options = options
         this._metronom = metronom.Create(this._options.metronom)
         this._servers = this._options.servers.map((m,i) => { return {...m, idxs: `${i > 99 ? '' : i > 9 ? '0' : '00'}${i}`} })
-
         this._state = {
             isStarted: false,
             needFinish: false,
@@ -75,6 +77,7 @@ export class Task {
         this._metronom.onTick(() => {
             this._onTick()
         })
+        this._allowMessagesInKindEnd = allowMessagesInKindEnd
         this.maxWorkers = this._servers.length
     }
 
@@ -145,7 +148,8 @@ export class Task {
             let worker = new worker_threads.Worker(path.join(__dirname, 'task.worker.js'), {
                 workerData: {
                     servers: servers,
-                    queries: this._options.queries
+                    queries: this._options.queries,
+                    allowMessagesInKindEnd: this._allowMessagesInKindEnd
                 } as TWorkerOptions
             })
             worker.on('message', (result: TWorkerResult) => {
@@ -195,7 +199,7 @@ export class Task {
                     completeIdx.push(serversIdx)
                     if (completeIdx.length === ticket.countWorkers) {
                         ticket.dateStop = vv.dateFormat(new Date(), '126'),
-                        this._sendChanged({kind: 'stop', ticket: ticket})
+                        this._sendChanged({kind: 'stop', ticket: ticket, messages: result.messages})
                         if (chunks.fullFileNameTickets) {
                             fs.ensureDir(path.parse(chunks.fullFileNameTickets).dir, error => {
                                 if (error) {
@@ -204,7 +208,8 @@ export class Task {
                                 fs.writeFile(chunks.fullFileNameTickets, JSON.stringify({
                                     ...ticket,
                                     servers: ticket.servers.map(m => { return {
-                                        ...m, state: undefined
+                                        ...m,
+                                        state: undefined
                                     }})
                                 }, null, 4), 'utf8', error => {
                                     if (error) {

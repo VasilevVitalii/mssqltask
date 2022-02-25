@@ -17,7 +17,7 @@ export function Go() {
             pathSaveRows: logPath,
             pathSaveMessages: logPath
         }
-    })
+    }, true)
 
     task.onError(error => {
         console.log(error)

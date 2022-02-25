@@ -11,7 +11,8 @@ export type TServerWorker = TServer & {
 
 export type TWorkerOptions = {
     servers: TServerWorker[],
-    queries: string[]
+    queries: string[],
+    allowMessagesInKindEnd: boolean
 }
 
 export type TWorkerResult =
@@ -19,7 +20,9 @@ export type TWorkerResult =
     {kind: 'messages', idxs: string, data: TMessage[], count: number} |
     {kind: 'rows', idxs: string, data: any[], count: number} |
     {kind: 'stop', idxs: string, duration: number, error: string} |
-    {kind: 'end', errors: string[]}
+    {kind: 'end', errors: string[], messages: TAllMessage[]}
+
+export type TAllMessage = {serverIdxs: string, messages: TMessage[]}
 
 const env = {
     options: workerData as TWorkerOptions,
@@ -27,15 +30,10 @@ const env = {
     serverResults: [] as {server: TServerWorker, result: TExecResult}[],
     serverHasRows: [] as TServerWorker[],
     serverHasMessages: [] as TServerWorker[],
+    serverHasMessagesForKindEnd: [] as TAllMessage[],
 }
 
 const stream = filestream.Create({prefix: '[\n', suffix: '\n]'})
-// stream.onClose(result => {
-//     parentPort.postMessage({
-//         kind: 'end',
-//         errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
-//     } as TWorkerResult)
-// })
 
 env.options.servers.forEach(server => {
     const allowMessages = server.fullFileNameMessages ? true : false
@@ -78,10 +76,20 @@ let timerServerResult = setTimeout(function tick() {
         return
     }
     if (result.kind === 'messages') {
+        if (env.options.allowMessagesInKindEnd) {
+            const fnd = env.serverHasMessagesForKindEnd.find(f => f.serverIdxs === server.idxs)
+            if (fnd) {
+                fnd.messages.push(...result.data)
+            } else {
+                env.serverHasMessagesForKindEnd.push({serverIdxs: server.idxs, messages: result.data})
+            }
+        }
+
         if (!env.serverHasMessages.some(f => f === server)) env.serverHasMessages.push(server)
         if (server.fullFileNameMessages) {
             stream.write({fullFileName: server.fullFileNameMessages, data: result.data.map(m => { return {kind: 'msg', ...m} })})
         }
+
         parentPort.postMessage({
             kind: 'messages',
             idxs: server.idxs,
@@ -115,10 +123,10 @@ let timerServerResult = setTimeout(function tick() {
             stream.close(result => {
                 parentPort.postMessage({
                     kind: 'end',
-                    errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
+                    errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })],
+                    messages: env.serverHasMessagesForKindEnd
                 } as TWorkerResult)
             })
-            //stream.close()
         } else {
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             timerServerResult = setTimeout(tick, 50)

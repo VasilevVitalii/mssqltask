@@ -13,9 +13,9 @@ export interface IApp {
     maxWorkersSet(value: number): void
 }
 
-export function Create(options: TTask): IApp {
+export function Create(options: TTask, allowMessagesInKindEnd: boolean): IApp {
     const worker = new worker_threads.Worker(path.join(__dirname, 'index.worker.js'), {
-        workerData: options
+        workerData: {task: options, allowMessagesInKindEnd: allowMessagesInKindEnd},
     })
     worker.on('message', (result: TWorkerResult) => {
         switch (result.kind) {

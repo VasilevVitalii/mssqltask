@@ -3,8 +3,8 @@ import fs from 'fs-extra'
 import worker_threads from 'worker_threads'
 import * as metronom from 'vv-metronom'
 import * as vv from 'vv-common'
-import { TServer } from './server'
-import { TWorkerResult, TWorkerOptions, TServerWorker, TAllMessage } from './task.worker'
+import { TMessage, TServer } from './server'
+import { TWorkerResult, TWorkerOptions, TServerWorker } from './task.worker'
 
 export type TTask = {
     key: string
@@ -46,6 +46,8 @@ export type TTaskState =
     {kind: 'process', ticket: TTicketResult} |
     {kind: 'stop', ticket: TTicketResult, messages: TAllMessage[]} |
     {kind: 'finish'}
+
+export type TAllMessage = {serverIdxs: string, messages: TMessage[]}
 
 export class Task {
     private _options: TTask
@@ -142,6 +144,7 @@ export class Task {
         })
 
         const completeIdx = [] as number[]
+        const messages = [] as TAllMessage[]
 
         this._sendChanged({kind: 'start', usedWorkers: ticket.countWorkers, ticket: ticket})
         chunks.serverWorkers.forEach((servers, serversIdx) => {
@@ -173,6 +176,12 @@ export class Task {
                 }
 
                 if (result.kind === 'messages') {
+                    const msg = messages.find(f => f.serverIdxs === result.idxs)
+                    if (msg) {
+                        msg.messages.push(...result.data)
+                    } else {
+                        messages.push({serverIdxs: result.idxs, messages: result.data})
+                    }
                     const ticketServer = ticket.servers.find(f => f.idxs === result.idxs)
                     if (ticketServer) {
                         ticketServer.countMessages = ticketServer.countMessages + result.count
@@ -199,7 +208,11 @@ export class Task {
                     completeIdx.push(serversIdx)
                     if (completeIdx.length === ticket.countWorkers) {
                         ticket.dateStop = vv.dateFormat(new Date(), '126'),
-                        this._sendChanged({kind: 'stop', ticket: ticket, messages: result.messages})
+                        this._sendChanged({
+                            kind: 'stop',
+                            ticket: ticket,
+                            messages: messages
+                        })
                         if (chunks.fullFileNameTickets) {
                             fs.ensureDir(path.parse(chunks.fullFileNameTickets).dir, error => {
                                 if (error) {

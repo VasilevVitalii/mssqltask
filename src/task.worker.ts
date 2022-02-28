@@ -20,9 +20,7 @@ export type TWorkerResult =
     {kind: 'messages', idxs: string, data: TMessage[], count: number} |
     {kind: 'rows', idxs: string, data: any[], count: number} |
     {kind: 'stop', idxs: string, duration: number, error: string} |
-    {kind: 'end', errors: string[], messages: TAllMessage[]}
-
-export type TAllMessage = {serverIdxs: string, messages: TMessage[]}
+    {kind: 'end', errors: string[]}
 
 const env = {
     options: workerData as TWorkerOptions,
@@ -30,7 +28,6 @@ const env = {
     serverResults: [] as {server: TServerWorker, result: TExecResult}[],
     serverHasRows: [] as TServerWorker[],
     serverHasMessages: [] as TServerWorker[],
-    serverHasMessagesForKindEnd: [] as TAllMessage[],
 }
 
 const stream = filestream.Create({prefix: '[\n', suffix: '\n]'})
@@ -76,15 +73,6 @@ let timerServerResult = setTimeout(function tick() {
         return
     }
     if (result.kind === 'messages') {
-        if (env.options.allowMessagesInKindEnd) {
-            const fnd = env.serverHasMessagesForKindEnd.find(f => f.serverIdxs === server.idxs)
-            if (fnd) {
-                fnd.messages.push(...result.data)
-            } else {
-                env.serverHasMessagesForKindEnd.push({serverIdxs: server.idxs, messages: result.data})
-            }
-        }
-
         if (!env.serverHasMessages.some(f => f === server)) env.serverHasMessages.push(server)
         if (server.fullFileNameMessages) {
             stream.write({fullFileName: server.fullFileNameMessages, data: result.data.map(m => { return {kind: 'msg', ...m} })})
@@ -123,8 +111,7 @@ let timerServerResult = setTimeout(function tick() {
             stream.close(result => {
                 parentPort.postMessage({
                     kind: 'end',
-                    errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })],
-                    messages: env.serverHasMessagesForKindEnd
+                    errors: [...env.errors,  ...result.filter(f => f.error). map(m => { return m.error.message })]
                 } as TWorkerResult)
             })
         } else {

@@ -1,6 +1,6 @@
 {
     "name": "mssqltask",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "description": "Task for MS SQL Server",
     "main": "dist/src/index.js",
     "scripts": {
@@ -36,6 +36,6 @@
         "mssqldriver": "0.0.11",
         "vv-common": "0.1.1",
         "vv-filestream": "0.2.0",
-        "vv-metronom": "0.0.9"
+        "vv-metronom": "0.1.1"
     }
 }

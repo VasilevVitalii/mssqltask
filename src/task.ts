@@ -85,8 +85,10 @@ export class Task {
 
     start() {
         if (this._state.isStarted) return
-        this._state.isStarted = true
-        this._metronom.start()
+        this._state.isStarted = this._metronom.start()
+        if (!this._state.isStarted) {
+            this._sendError(new Error('task not started'))
+        }
     }
 
     finish(callback?: () => void) {
